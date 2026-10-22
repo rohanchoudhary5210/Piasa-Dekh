@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "historyId": "fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5",
+  "currentRevision": "44110d24-3328-4cef-a5aa-d93d067a7af5",
+  "pendingChanges": false,
+  "files": {
+    "assets/sfx/impact/impactBell_heavy_000.ogg": {
+      "hash": "94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\94\\94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f"
+    },
+    "assets/sfx/impact/impactMetal_heavy_000.ogg": {
+      "hash": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\e0\\e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831"
+    },
+    "assets/sfx/interface/bong_001.ogg": {
+      "hash": "d21d0f0b782445db579d11e2506b24cd1ac9d664ee33aeaf807761aa7b6fd710",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\d2\\d21d0f0b782445db579d11e2506b24cd1ac9d664ee33aeaf807761aa7b6fd710"
+    },
+    "assets/sfx/interface/click_001.ogg": {
+      "hash": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\cc\\ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+    },
+    "hyperframes.json": {
+      "hash": "53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\53\\53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50"
+    },
+    "index.html": {
+      "hash": "a44b7e172bf74f25ea6b57be1575ea8f37664f133126467cb71d060ca326943b",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\a4\\a44b7e172bf74f25ea6b57be1575ea8f37664f133126467cb71d060ca326943b"
+    },
+    "meta.json": {
+      "hash": "41970451ee9c1e3d47ac3f321c72882630fa5bd9d1645a3126e6dcfb36e86676",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\41\\41970451ee9c1e3d47ac3f321c72882630fa5bd9d1645a3126e6dcfb36e86676"
+    },
+    "assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3": {
+      "hash": "5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\58\\5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1"
+    }
+  },
+  "revisions": {
+    "44110d24-3328-4cef-a5aa-d93d067a7af5": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792698585578,
+      "endedAt": 1792698585581,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\78\\7821d3ddce5da378b17bbb87d150ea388f95c3cb1af2eecf75fd7eb47b0ef9b2",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\fe56a7bb-ce58-4cb7-ba9e-a5b5306c9ad5\\blobs\\a4\\a44b7e172bf74f25ea6b57be1575ea8f37664f133126467cb71d060ca326943b"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "60e31a90-116e-4cd8-a65c-d1c0065c109c",
+      "completedAt": 1792698626165,
+      "output": "c:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\brag-portrait.mp4",
+      "status": "completed",
+      "revision": "44110d24-3328-4cef-a5aa-d93d067a7af5"
+    },
+    "retainedRevisions": [
+      "44110d24-3328-4cef-a5aa-d93d067a7af5"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}

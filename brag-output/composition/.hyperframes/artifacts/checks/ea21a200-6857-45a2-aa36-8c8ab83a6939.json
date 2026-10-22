@@ -1,0 +1,347 @@
+{
+  "ok": false,
+  "strict": false,
+  "browserSkipped": true,
+  "lint": {
+    "ok": false,
+    "errorCount": 6,
+    "warningCount": 11,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "studio_missing_editable_id",
+        "severity": "warning",
+        "message": "<audio data-start=\"0\"> has no id, so Studio cannot use a stable edit target for its timeline and canvas controls.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add a stable, human-readable id such as id=\"hero-title\" or id=\"scene-1-card\" to every timeline-visible element you want agents or Studio to edit."
+      },
+      {
+        "code": "studio_missing_editable_id",
+        "severity": "warning",
+        "message": "<audio data-start=\"1.8\"> has no id, so Studio cannot use a stable edit target for its timeline and canvas controls.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add a stable, human-readable id such as id=\"hero-title\" or id=\"scene-1-card\" to every timeline-visible element you want agents or Studio to edit."
+      },
+      {
+        "code": "studio_missing_editable_id",
+        "severity": "warning",
+        "message": "<audio data-start=\"5.2\"> has no id, so Studio cannot use a stable edit target for its timeline and canvas controls.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add a stable, human-readable id such as id=\"hero-title\" or id=\"scene-1-card\" to every timeline-visible element you want agents or Studio to edit."
+      },
+      {
+        "code": "studio_missing_editable_id",
+        "severity": "warning",
+        "message": "<audio data-start=\"10.8\"> has no id, so Studio cannot use a stable edit target for its timeline and canvas controls.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add a stable, human-readable id such as id=\"hero-title\" or id=\"scene-1-card\" to every timeline-visible element you want agents or Studio to edit."
+      },
+      {
+        "code": "studio_missing_editable_id",
+        "severity": "warning",
+        "message": "<audio data-start=\"14.2\"> has no id, so Studio cannot use a stable edit target for its timeline and canvas controls.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add a stable, human-readable id such as id=\"hero-title\" or id=\"scene-1-card\" to every timeline-visible element you want agents or Studio to edit."
+      },
+      {
+        "code": "media_missing_id",
+        "severity": "error",
+        "message": "<audio> has data-start but no id attribute. The renderer requires id to discover media elements, so this audio will be SILENT in renders.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add a unique id attribute: <audio id=\"my-audio\" ...>"
+      },
+      {
+        "code": "gsap_animates_clip_element",
+        "severity": "error",
+        "message": "GSAP animation sets visibility on a clip element. Selector \"#scene1\" resolves to element <div id=\"scene1\" class=\"scene clip\">. The framework manages clip visibility, and autoAlpha writes visibility as well as opacity. Do not animate these properties on clip elements.",
+        "selector": "#scene1",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove the visibility/display/autoAlpha tween, or move the content into a child <div> and target that instead."
+      },
+      {
+        "code": "gsap_animates_clip_element",
+        "severity": "error",
+        "message": "GSAP animation sets visibility on a clip element. Selector \"#scene2\" resolves to element <div id=\"scene2\" class=\"scene clip\">. The framework manages clip visibility, and autoAlpha writes visibility as well as opacity. Do not animate these properties on clip elements.",
+        "selector": "#scene2",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove the visibility/display/autoAlpha tween, or move the content into a child <div> and target that instead."
+      },
+      {
+        "code": "gsap_animates_clip_element",
+        "severity": "error",
+        "message": "GSAP animation sets visibility on a clip element. Selector \"#scene3\" resolves to element <div id=\"scene3\" class=\"scene clip\">. The framework manages clip visibility, and autoAlpha writes visibility as well as opacity. Do not animate these properties on clip elements.",
+        "selector": "#scene3",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove the visibility/display/autoAlpha tween, or move the content into a child <div> and target that instead."
+      },
+      {
+        "code": "gsap_animates_clip_element",
+        "severity": "error",
+        "message": "GSAP animation sets visibility on a clip element. Selector \"#scene4\" resolves to element <div id=\"scene4\" class=\"scene clip\">. The framework manages clip visibility, and autoAlpha writes visibility as well as opacity. Do not animate these properties on clip elements.",
+        "selector": "#scene4",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove the visibility/display/autoAlpha tween, or move the content into a child <div> and target that instead."
+      },
+      {
+        "code": "gsap_infinite_repeat",
+        "severity": "warning",
+        "message": "GSAP tween uses `repeat: -1` (infinite), but the composition declares a finite 18s window. HyperFrames clips deterministic seeking and export to that explicit duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Keep the explicit finite composition `data-duration`. Use a finite repeat count only when the loop itself must end before the composition does."
+      },
+      {
+        "code": "gsap_non_transform_motion",
+        "severity": "error",
+        "message": "GSAP tween on \"#s2-amount\" uses motion that snaps to integer device pixels: roundProps. Layout and text-reflow properties snap during browser layout; roundProps rounds the tween value. Slow motion or an ease-out tail then stutters under the seek-by-frame capture engine. Animate transforms (x/y/scale/opacity) instead.",
+        "selector": "#s2-amount",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "remove roundProps. Transforms interpolate sub-pixel and stay smooth at any speed."
+      },
+      {
+        "code": "composition_file_too_large",
+        "severity": "warning",
+        "message": "This HTML composition file has 364 lines. Smaller sub-compositions are easier to read, iterate on, and diff.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Split coherent scenes or layers into separate .html files under compositions/, then mount them from the parent with data-composition-src so each file stays small enough to inspect, revise, and validate independently."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene1\"> is a timeline element that contains nested <div id=\"s1-tag\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene1",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene1\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene2\"> is a timeline element that contains nested <div id=\"s2-bento\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene2",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene2\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene3\"> is a timeline element that contains nested <div>. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene3",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene3\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene4\"> is a timeline element that contains nested <div id=\"s4-box\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene4",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene4\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      }
+    ],
+    "filesScanned": 1
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 0,
+    "samples": [],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [],
+    "checked": 0,
+    "passed": 0
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "step": 0,
+    "samples": 0
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

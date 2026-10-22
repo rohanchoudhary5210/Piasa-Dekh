@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Paisa Dekh Portrait Video</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --bg: #09090B;
+        --surface: #141417;
+        --surface-elevated: #1E1E24;
+        --border: #27272A;
+        --mana-purple: #C084FC;
+        --mana-purple-glow: rgba(192, 132, 252, 0.25);
+        --safe-green: #34D399;
+        --safe-green-glow: rgba(52, 211, 153, 0.2);
+        --boss-red: #FB7185;
+        --boss-red-glow: rgba(251, 113, 133, 0.25);
+        --coin-gold: #FBBF24;
+        --streak-orange: #FB923C;
+        --text-primary: #FFFFFF;
+        --text-secondary: #E4E4E7;
+        --text-muted: #A1A1AA;
+        --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: var(--font-sans);
+        color: var(--text-primary);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: radial-gradient(circle at 50% 35%, #171123 0%, var(--bg) 80%);
+      }
+
+      .ambient-glow {
+        position: absolute;
+        width: 800px;
+        height: 800px;
+        border-radius: 50%;
+        background: radial-gradient(circle, var(--mana-purple-glow) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(90px);
+        transform: translate(-50%, -50%);
+        top: 45%;
+        left: 50%;
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .scene-content {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0 60px;
+      }
+
+      /* Scene 1: Hook */
+      .hook-tag {
+        font-family: var(--font-mono);
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--mana-purple);
+        margin-bottom: 36px;
+        background: rgba(192, 132, 252, 0.12);
+        padding: 12px 32px;
+        border-radius: 9999px;
+        border: 1px solid rgba(192, 132, 252, 0.35);
+      }
+
+      .hook-title {
+        font-size: 76px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        text-align: center;
+        line-height: 1.12;
+        max-width: 960px;
+        color: var(--text-primary);
+        text-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+      }
+
+      .hook-title span {
+        background: linear-gradient(135deg, #FFFFFF 0%, #C084FC 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .hook-sub {
+        font-size: 34px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-top: 44px;
+        text-align: center;
+        letter-spacing: -0.01em;
+      }
+
+      /* Scene 2: Daily Mana Bento (Vertical) */
+      .bento-vertical-container {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        align-items: center;
+        width: 940px;
+      }
+
+      .bento-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 36px;
+        padding: 48px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+      }
+
+      .card-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(192, 132, 252, 0.14);
+        border: 1px solid rgba(192, 132, 252, 0.35);
+        color: var(--mana-purple);
+        font-family: var(--font-mono);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 10px 22px;
+        border-radius: 14px;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--safe-green-glow);
+        border: 1px solid rgba(52, 211, 153, 0.4);
+        color: var(--safe-green);
+        font-size: 20px;
+        font-weight: 700;
+        padding: 10px 24px;
+        border-radius: 9999px;
+      }
+
+      .mana-amount-row {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        margin-bottom: 28px;
+      }
+
+      .mana-currency {
+        font-size: 64px;
+        font-weight: 700;
+        color: var(--mana-purple);
+      }
+
+      .mana-val {
+        font-size: 110px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        font-family: var(--font-mono);
+        color: var(--text-primary);
+        line-height: 1;
+      }
+
+      .mana-cycle-info {
+        font-size: 24px;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .mana-bar-track {
+        width: 100%;
+        height: 18px;
+        background: var(--surface-elevated);
+        border-radius: 9999px;
+        overflow: hidden;
+        margin-bottom: 28px;
+        border: 1px solid var(--border);
+      }
+
+      .mana-bar-fill {
+        height: 100%;
+        width: 85%;
+        background: linear-gradient(90deg, #A855F7, #34D399);
+        border-radius: 9999px;
+      }
+
+      .toast-chip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface-elevated);
+        border: 1px solid var(--border);
+        padding: 22px 28px;
+        border-radius: 24px;
+        margin-top: 20px;
+      }
+
+      .toast-left {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .toast-icon {
+        width: 54px;
+        height: 54px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+      }
+
+      .toast-name {
+        font-size: 26px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .toast-sub {
+        font-size: 18px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      .toast-amt {
+        font-family: var(--font-mono);
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--boss-red);
+      }
+
+      .sub-bento-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 32px;
+        padding: 36px 44px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .sub-bento-card h3 {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+      }
+
+      .sub-bento-card p {
+        font-size: 20px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+
+      /* Scene 3: Vertical Duel */
+      .duel-vertical-stage {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        align-items: center;
+        width: 940px;
+        position: relative;
+      }
+
+      .hero-card, .boss-card {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 36px;
+        padding: 40px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-card {
+        border-color: rgba(192, 132, 252, 0.4);
+        box-shadow: 0 20px 50px rgba(168, 85, 247, 0.15);
+      }
+
+      .boss-card {
+        border-color: rgba(251, 113, 133, 0.4);
+        box-shadow: 0 20px 50px rgba(244, 63, 94, 0.15);
+      }
+
+      .avatar-box {
+        width: 84px;
+        height: 84px;
+        border-radius: 24px;
+        background: var(--surface-elevated);
+        border: 2px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 42px;
+        margin-bottom: 20px;
+      }
+
+      .duel-title {
+        font-size: 38px;
+        font-weight: 800;
+        margin-bottom: 6px;
+      }
+
+      .duel-sub {
+        font-size: 22px;
+        color: var(--text-secondary);
+        margin-bottom: 22px;
+      }
+
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .stat-hp-bar {
+        width: 100%;
+        height: 16px;
+        background: var(--surface-elevated);
+        border-radius: 9999px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+
+      .stat-hp-fill-hero {
+        width: 100%;
+        height: 100%;
+        background: var(--safe-green);
+        border-radius: 9999px;
+      }
+
+      .stat-hp-fill-boss {
+        width: 100%;
+        height: 100%;
+        background: var(--boss-red);
+        border-radius: 9999px;
+      }
+
+      .vs-badge-portrait {
+        font-family: var(--font-mono);
+        font-size: 26px;
+        font-weight: 900;
+        color: var(--text-muted);
+        background: var(--surface-elevated);
+        border: 1px solid var(--border);
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .strike-fx-portrait {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        background: linear-gradient(135deg, #FBBF24, #F43F5E);
+        color: #FFFFFF;
+        font-family: var(--font-mono);
+        font-size: 38px;
+        font-weight: 900;
+        padding: 24px 44px;
+        border-radius: 28px;
+        box-shadow: 0 20px 80px rgba(244, 63, 94, 0.8);
+        border: 3px solid #FFFFFF;
+        pointer-events: none;
+        z-index: 50;
+        white-space: nowrap;
+        text-align: center;
+      }
+
+      /* Scene 4: Outro (Portrait) */
+      .outro-portrait-box {
+        text-align: center;
+        width: 960px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .app-icon {
+        width: 130px;
+        height: 130px;
+        border-radius: 36px;
+        background: linear-gradient(135deg, #7E22CE 0%, #A855F7 100%);
+        margin-bottom: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 64px;
+        box-shadow: 0 20px 60px rgba(168, 85, 247, 0.45);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .outro-title {
+        font-size: 96px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        margin-bottom: 20px;
+        color: var(--text-primary);
+        line-height: 1;
+      }
+
+      .outro-tagline {
+        font-size: 38px;
+        font-weight: 600;
+        color: var(--mana-purple);
+        margin-bottom: 56px;
+        letter-spacing: -0.01em;
+      }
+
+      .cta-vertical-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        width: 100%;
+        max-width: 720px;
+        margin-bottom: 48px;
+      }
+
+      .store-btn-large {
+        background: linear-gradient(135deg, #A855F7 0%, #7E22CE 100%);
+        color: #FFFFFF;
+        font-size: 28px;
+        font-weight: 700;
+        padding: 24px 48px;
+        border-radius: 9999px;
+        box-shadow: 0 16px 40px rgba(168, 85, 247, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .store-btn-large-secondary {
+        background: var(--surface-elevated);
+        color: var(--text-primary);
+        font-size: 26px;
+        font-weight: 600;
+        padding: 22px 44px;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        border: 1px solid var(--border);
+      }
+
+      .trust-strip-portrait {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        align-items: center;
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="18"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div class="ambient-glow" id="glow"></div>
+
+      <!-- Audio Track & SFX -->
+      <audio
+        id="bg-music"
+        src="assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3"
+        class="clip"
+        data-start="0"
+        data-duration="18"
+        data-volume="0.65"
+        data-fade-out="2.0"
+      ></audio>
+
+      <audio
+        id="sfx-bell"
+        src="assets/sfx/impact/impactBell_heavy_000.ogg"
+        class="clip"
+        data-start="1.8"
+        data-duration="1.48"
+        data-volume="0.8"
+      ></audio>
+
+      <audio
+        id="sfx-click"
+        src="assets/sfx/interface/click_001.ogg"
+        class="clip"
+        data-start="5.2"
+        data-duration="0.10"
+        data-volume="0.75"
+      ></audio>
+
+      <audio
+        id="sfx-metal"
+        src="assets/sfx/impact/impactMetal_heavy_000.ogg"
+        class="clip"
+        data-start="10.8"
+        data-duration="0.17"
+        data-volume="0.85"
+      ></audio>
+
+      <audio
+        id="sfx-bong"
+        src="assets/sfx/interface/bong_001.ogg"
+        class="clip"
+        data-start="14.2"
+        data-duration="0.13"
+        data-volume="0.7"
+      ></audio>
+
+      <!-- SCENE 1: The Hook (0 - 4.2s) -->
+      <div class="clip" id="scene1" data-start="0" data-duration="4.2">
+        <div class="scene-content" id="s1-content">
+          <div class="hook-tag" id="s1-tag" data-layout-ignore="true">GAMIFIED FINTECH</div>
+          <h1 class="hook-title" id="s1-title">
+            YOUR PAYCHECK IS NOT<br />
+            <span>A PASSIVE LUMP SUM.</span>
+          </h1>
+          <p class="hook-sub" id="s1-sub">It's a dynamic 30-day survival quest.</p>
+        </div>
+      </div>
+
+      <!-- SCENE 2: The Daily Mana (4.0 - 8.8s) -->
+      <div class="clip" id="scene2" data-start="4.0" data-duration="4.8">
+        <div class="scene-content" id="s2-content">
+          <div class="bento-vertical-container" id="s2-bento">
+            <div class="bento-card" id="s2-main-card">
+              <div class="card-header">
+                <div class="card-badge" data-layout-ignore="true">
+                  <span>⚡</span>
+                  <span>TODAY'S DAILY MANA</span>
+                </div>
+                <div class="status-pill" id="s2-pill">
+                  <span>●</span>
+                  <span id="s2-pill-text">Safe Zone</span>
+                </div>
+              </div>
+
+              <div class="mana-amount-row">
+                <span class="mana-currency">₹</span>
+                <span class="mana-val" id="s2-amount">1,450</span>
+                <span class="mana-cycle-info">/ remaining today</span>
+              </div>
+
+              <div class="mana-bar-track">
+                <div class="mana-bar-fill" id="s2-bar"></div>
+              </div>
+
+              <div class="toast-chip" id="s2-toast">
+                <div class="toast-left">
+                  <div class="toast-icon">☕</div>
+                  <div>
+                    <div class="toast-name">Blue Tokai Cold Brew</div>
+                    <div class="toast-sub" data-layout-ignore="true">Discretionary • 2:14 PM</div>
+                  </div>
+                </div>
+                <div class="toast-amt">-₹220</div>
+              </div>
+            </div>
+
+            <div class="sub-bento-card" id="s2-sub-card">
+              <div style="font-size: 40px;">🛡️</div>
+              <div>
+                <h3>Zero-Drift Paise Smoothing</h3>
+                <p>Overspending borrows gently from future days. Zero silent debt.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 3: Hero vs Boss Duel (8.6 - 14.2s) -->
+      <div class="clip" id="scene3" data-start="8.6" data-duration="5.6">
+        <div class="scene-content" id="s3-content">
+          <div class="hook-tag" data-layout-ignore="true" style="margin-bottom: 24px;">MONTHLY BOSS ENCOUNTER</div>
+          <div class="duel-vertical-stage" id="s3-stage">
+            <!-- Hero Companion -->
+            <div class="hero-card" id="s3-hero">
+              <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 16px;">
+                <div class="avatar-box" style="margin-bottom: 0;">🛡️</div>
+                <div>
+                  <div class="duel-title">Sir Reginald</div>
+                  <div class="duel-sub" style="margin-bottom: 0;">Level 5 Companion Paladin</div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span style="color: var(--safe-green);">HERO HP: 100/100</span>
+                <span style="color: var(--streak-orange);">🔥 14-Day Streak</span>
+              </div>
+              <div class="stat-hp-bar">
+                <div class="stat-hp-fill-hero"></div>
+              </div>
+            </div>
+
+            <div class="vs-badge-portrait" data-layout-ignore="true">VS</div>
+
+            <!-- Boss Card -->
+            <div class="boss-card" id="s3-boss">
+              <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 16px;">
+                <div class="avatar-box" style="margin-bottom: 0; border-color: rgba(251, 113, 133, 0.4);">👹</div>
+                <div>
+                  <div class="duel-title" style="color: var(--boss-red);">Month-End Overspend</div>
+                  <div class="duel-sub" style="margin-bottom: 0;">World Boss • Cycle Finisher</div>
+                </div>
+              </div>
+              <div class="stat-row">
+                <span style="color: var(--boss-red);" id="s3-boss-hp-label">BOSS HP: 10,000 / 10,000</span>
+                <span style="color: var(--coin-gold);">⚔️ Vault Strike Ready</span>
+              </div>
+              <div class="stat-hp-bar">
+                <div class="stat-hp-fill-boss" id="s3-boss-bar"></div>
+              </div>
+            </div>
+
+            <div class="strike-fx-portrait" id="s3-strike" data-layout-allow-overlap="true" data-layout-allow-occlusion="true">
+              💥 SURPLUS CRITICAL STRIKE!<br />-₹3,750 BOSS HP
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 4: Outro (14.0 - 18.0s) -->
+      <div class="clip" id="scene4" data-start="14.0" data-duration="4.0">
+        <div class="scene-content" id="s4-content">
+          <div class="outro-portrait-box" id="s4-box">
+            <div class="app-icon" id="s4-icon">💰</div>
+            <h1 class="outro-title" id="s4-title">Paisa Dekh</h1>
+            <p class="outro-tagline" id="s4-tagline">
+              Bachat bhi aur tracking bhi.
+            </p>
+
+            <div class="cta-vertical-stack" id="s4-cta-stack">
+              <div class="store-btn-large">
+                <span>🚀</span>
+                <span>Coming Soon</span>
+              </div>
+            </div>
+
+            <div class="trust-strip-portrait" id="s4-trust-strip">
+              <div><span style="color: var(--safe-green);">🛡️</span> 100% Private & Offline Engine</div>
+              <div><span style="color: var(--mana-purple);">🔒</span> Zero Bank Login Needed</div>
+              <div><span style="color: var(--coin-gold);">⚡</span> Zero-Drift Daily Savings</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      // Ambient breathing glow
+      tl.to("#glow", {
+        scale: 1.25,
+        opacity: 0.8,
+        duration: 4.5,
+        repeat: 3,
+        yoyo: true,
+        ease: "sine.inOut"
+      }, 0);
+
+      // ================= SCENE 1 (0.0s - 4.2s) =================
+      tl.set(["#s1-tag", "#s1-title", "#s1-sub"], { opacity: 1, y: 0, scale: 1 }, 0);
+      tl.fromTo("#s1-title", 
+        { scale: 0.98 }, 
+        { scale: 1.02, duration: 3.5, ease: "sine.inOut" }, 
+        0
+      );
+      tl.to("#s1-content", {
+        opacity: 0,
+        scale: 0.95,
+        filter: "blur(8px)",
+        duration: 0.5,
+        ease: "power2.in"
+      }, 3.7);
+
+      // ================= SCENE 2 (4.0s - 8.8s) =================
+      tl.fromTo("#s2-main-card", 
+        { opacity: 0, y: 50, scale: 0.92 }, 
+        { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "power4.out" }, 
+        4.1
+      );
+      tl.fromTo("#s2-sub-card", 
+        { opacity: 0, y: 30 }, 
+        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 
+        4.4
+      );
+      
+      // Transaction event at 5.2s
+      tl.fromTo("#s2-toast", 
+        { opacity: 0, y: -25, scale: 0.95 }, 
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.7)" }, 
+        5.2
+      );
+      tl.to("#s2-amount", {
+        scale: 1.15,
+        color: "#FB7185",
+        duration: 0.2,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.inOut",
+        onComplete: () => {
+          const el = document.getElementById("s2-amount");
+          if (el) el.innerText = "1,230";
+        }
+      }, 5.4);
+      tl.to("#s2-bar", {
+        width: "72%",
+        duration: 0.6,
+        ease: "power2.out"
+      }, 5.4);
+
+      tl.to("#s2-content", {
+        opacity: 0,
+        scale: 0.94,
+        filter: "blur(8px)",
+        duration: 0.5,
+        ease: "power2.in"
+      }, 8.3);
+
+      // ================= SCENE 3 (8.6s - 14.2s) =================
+      tl.fromTo("#s3-hero", 
+        { opacity: 0, y: -40 }, 
+        { opacity: 1, y: 0, duration: 0.7, ease: "power4.out" }, 
+        8.7
+      );
+      tl.fromTo(".vs-badge-portrait", 
+        { opacity: 0, scale: 0 }, 
+        { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, 
+        9.0
+      );
+      tl.fromTo("#s3-boss", 
+        { opacity: 0, y: 40 }, 
+        { opacity: 1, y: 0, duration: 0.7, ease: "power4.out" }, 
+        9.2
+      );
+
+      // Strike moment at 10.8s
+      tl.fromTo("#s3-strike", 
+        { scale: 0, rotation: -6, opacity: 0 }, 
+        { scale: 1.05, rotation: 0, opacity: 1, duration: 0.35, ease: "back.out(2.2)" }, 
+        10.8
+      );
+      tl.to("#s3-boss", {
+        x: "+=15",
+        repeat: 5,
+        yoyo: true,
+        duration: 0.05,
+        backgroundColor: "rgba(251, 113, 133, 0.25)"
+      }, 10.9);
+      tl.to("#s3-boss-bar", {
+        width: "62.5%",
+        duration: 0.7,
+        ease: "power3.out"
+      }, 11.0);
+      tl.call(() => {
+        const el = document.getElementById("s3-boss-hp-label");
+        if (el) el.innerText = "BOSS HP: 6,250 / 10,000";
+      }, null, 11.2);
+
+      tl.to("#s3-strike", {
+        opacity: 0,
+        scale: 1.25,
+        duration: 0.35,
+        ease: "power2.in"
+      }, 12.6);
+
+      tl.to("#s3-content", {
+        opacity: 0,
+        scale: 0.94,
+        filter: "blur(8px)",
+        duration: 0.5,
+        ease: "power2.in"
+      }, 13.7);
+
+      // ================= SCENE 4: Outro (14.0s - 18.0s) =================
+      tl.fromTo("#s4-icon", 
+        { opacity: 0, scale: 0.3, rotation: -25 }, 
+        { opacity: 1, scale: 1, rotation: 0, duration: 0.7, ease: "back.out(1.8)" }, 
+        14.1
+      );
+      tl.fromTo("#s4-title", 
+        { opacity: 0, y: 30 }, 
+        { opacity: 1, y: 0, duration: 0.7, ease: "power4.out" }, 
+        14.3
+      );
+      tl.fromTo("#s4-tagline", 
+        { opacity: 0, y: 20 }, 
+        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 
+        14.6
+      );
+      tl.fromTo("#s4-cta-stack", 
+        { opacity: 0, y: 25, scale: 0.95 }, 
+        { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.5)" }, 
+        14.9
+      );
+      tl.fromTo("#s4-trust-strip", 
+        { opacity: 0, y: 15 }, 
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 
+        15.2
+      );
+
+      // Register timeline for Hyperframes runtime
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

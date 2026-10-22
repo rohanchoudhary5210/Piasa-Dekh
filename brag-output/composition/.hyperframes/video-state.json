@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "historyId": "89b0c094-ace4-41a3-bee1-85f1c5e4ae6f",
+  "currentRevision": "b08ce108-c6fb-4423-aa3e-0e46545506aa",
+  "pendingChanges": false,
+  "files": {
+    "AGENTS.md": {
+      "hash": "fd0ea55029dfc62c31614321d782f47476d3d5daaaa4116b56318ed501911f1b",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\fd\\fd0ea55029dfc62c31614321d782f47476d3d5daaaa4116b56318ed501911f1b"
+    },
+    "CLAUDE.md": {
+      "hash": "fd0ea55029dfc62c31614321d782f47476d3d5daaaa4116b56318ed501911f1b",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\fd\\fd0ea55029dfc62c31614321d782f47476d3d5daaaa4116b56318ed501911f1b"
+    },
+    "hyperframes.json": {
+      "hash": "53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\53\\53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50"
+    },
+    "index.html": {
+      "hash": "fbb8a997428a53c579b109caf8b5512479d45613e71aaa512f133a9ce7e999db",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\fb\\fbb8a997428a53c579b109caf8b5512479d45613e71aaa512f133a9ce7e999db"
+    },
+    "meta.json": {
+      "hash": "41970451ee9c1e3d47ac3f321c72882630fa5bd9d1645a3126e6dcfb36e86676",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\41\\41970451ee9c1e3d47ac3f321c72882630fa5bd9d1645a3126e6dcfb36e86676"
+    },
+    "package.json": {
+      "hash": "93e0a0f0aa43e181a4d5f81405d1aeeae0d69edf28b45e50a299b26b2fc6fd1b",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\93\\93e0a0f0aa43e181a4d5f81405d1aeeae0d69edf28b45e50a299b26b2fc6fd1b"
+    },
+    "assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3": {
+      "hash": "5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\58\\5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1"
+    },
+    "assets/sfx/impact/impactBell_heavy_000.ogg": {
+      "hash": "94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\94\\94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f"
+    },
+    "assets/sfx/impact/impactMetal_heavy_000.ogg": {
+      "hash": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\e0\\e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831"
+    },
+    "assets/sfx/interface/bong_001.ogg": {
+      "hash": "d21d0f0b782445db579d11e2506b24cd1ac9d664ee33aeaf807761aa7b6fd710",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\d2\\d21d0f0b782445db579d11e2506b24cd1ac9d664ee33aeaf807761aa7b6fd710"
+    },
+    "assets/sfx/interface/click_001.ogg": {
+      "hash": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9",
+      "content": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\cc\\ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+    }
+  },
+  "revisions": {
+    "e8ee2974-9907-48ff-ad0b-60d14ac76d7e": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792695841156,
+      "endedAt": 1792695841194,
+      "files": {
+        "assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3": {
+          "before": null,
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\58\\5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1"
+        },
+        "assets/sfx/impact/impactBell_heavy_000.ogg": {
+          "before": null,
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\94\\94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f"
+        },
+        "assets/sfx/impact/impactMetal_heavy_000.ogg": {
+          "before": null,
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\e0\\e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831"
+        },
+        "assets/sfx/interface/bong_001.ogg": {
+          "before": null,
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\d2\\d21d0f0b782445db579d11e2506b24cd1ac9d664ee33aeaf807761aa7b6fd710"
+        },
+        "assets/sfx/interface/click_001.ogg": {
+          "before": null,
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\cc\\ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+        },
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\f6\\f647f277b2a0acb4998a7f79a757efbc20f620e4fc95407bd99ee36732764a62",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\46\\468d89882382474babdd8bf85da2ba9f3f21c52d1640ec47fcfe53c8aaa1468a"
+        }
+      }
+    },
+    "b83bee98-7632-4c4b-9d3f-bb7e3f245e1b": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792695903300,
+      "endedAt": 1792695903302,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\46\\468d89882382474babdd8bf85da2ba9f3f21c52d1640ec47fcfe53c8aaa1468a",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\33\\330a40a854395b5a214679a647daaa4c02bf9f1d7f5a56fe64aba5f0e68ec88c"
+        }
+      }
+    },
+    "d1392aca-8fd8-4b15-939f-c7c47eba9c71": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792695974940,
+      "endedAt": 1792695974944,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\33\\330a40a854395b5a214679a647daaa4c02bf9f1d7f5a56fe64aba5f0e68ec88c",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\20\\202436d24c4ed826f3e7393a8062f4122ff5f25142fe95233bcf54a758ee49de"
+        }
+      }
+    },
+    "48984e34-3155-47de-9462-037aca5f63dc": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792697167871,
+      "endedAt": 1792697167873,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\20\\202436d24c4ed826f3e7393a8062f4122ff5f25142fe95233bcf54a758ee49de",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\92\\92f1a8fd0513ce72e259f9daabf8ef33085e9a138d9e395cdfd6351a603a0b01"
+        }
+      }
+    },
+    "f06f1253-f67f-411b-83d2-4e866d3d8efc": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792697719947,
+      "endedAt": 1792697719951,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\92\\92f1a8fd0513ce72e259f9daabf8ef33085e9a138d9e395cdfd6351a603a0b01",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\b8\\b882c84da8447e8b703a709b39278dd58313180fe3b26741a2c830f3d9b7faeb"
+        }
+      }
+    },
+    "7d13c853-3347-4a57-9ae5-155b4faff3bc": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792697824037,
+      "endedAt": 1792697824040,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\b8\\b882c84da8447e8b703a709b39278dd58313180fe3b26741a2c830f3d9b7faeb",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\ba\\bae80c1717b27684d78b6c51030194e6f38b36fe3cd9299dc4065674f9ad39a9"
+        }
+      }
+    },
+    "b08ce108-c6fb-4423-aa3e-0e46545506aa": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1792698636393,
+      "endedAt": 1792698636396,
+      "files": {
+        "index.html": {
+          "before": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\ba\\bae80c1717b27684d78b6c51030194e6f38b36fe3cd9299dc4065674f9ad39a9",
+          "after": "C:\\Users\\Asus\\.cache\\hyperframes\\history\\89b0c094-ace4-41a3-bee1-85f1c5e4ae6f\\blobs\\fb\\fbb8a997428a53c579b109caf8b5512479d45613e71aaa512f133a9ce7e999db"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": {
+      "revision": null,
+      "id": "78f3abdf-bdfc-4b0a-a4cc-1ed3dc3e6e9a"
+    },
+    "revisions": {
+      "e8ee2974-9907-48ff-ad0b-60d14ac76d7e": [
+        {
+          "id": "ea21a200-6857-45a2-aa36-8c8ab83a6939",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": true,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 3000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1792695841417,
+          "contentHash": "99067d01b856e60012d289777f05e53b3b197c5c87c8e2bd2875ddf8e19fe94d",
+          "revision": "e8ee2974-9907-48ff-ad0b-60d14ac76d7e",
+          "inputFingerprint": "1d295fe8993c842cd5b929c8ab1015bf3e155a71eadcf45a65b439f3c27693eb",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "d20cfadd-c459-43d0-8502-481ceeba3673"
+        }
+      ],
+      "b83bee98-7632-4c4b-9d3f-bb7e3f245e1b": [
+        {
+          "id": "f9507376-f7a3-4ffa-881a-8190f383b0e7",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 3000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1792695912953,
+          "contentHash": "dc6f97938c929e6a5541f52472c1cb31e17af73e696e9d6c2469c42cb802bff1",
+          "revision": "b83bee98-7632-4c4b-9d3f-bb7e3f245e1b",
+          "inputFingerprint": "5296368effde4777c5368f56bfba100ed52d09228361a3f3d0321fe862a86181",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "d20cfadd-c459-43d0-8502-481ceeba3673"
+        }
+      ],
+      "d1392aca-8fd8-4b15-939f-c7c47eba9c71": [
+        {
+          "id": "bef43d19-ad4b-4e88-a666-c6cee5817b9c",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 3000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1792695984071,
+          "contentHash": "f67aafb40c964a5f8c7b4c578da5b887ea530b958bb1d6771349bdb800b03952",
+          "revision": "d1392aca-8fd8-4b15-939f-c7c47eba9c71",
+          "inputFingerprint": "06ea3cc5fb489ab1bd4c27d21355654d292780c77c8f51179cd9f19e2d00bfc3",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "2edac6bf-4975-47d2-945e-1666eb47dc5c"
+        }
+      ],
+      "f06f1253-f67f-411b-83d2-4e866d3d8efc": [
+        {
+          "id": "6e78e659-e95a-4ceb-be0b-ff90f326dca4",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 3000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1792697730159,
+          "contentHash": "c7d7325a55b37856fd627dae487993271f1f59158af12b9164b0949cb8fecb79",
+          "revision": "f06f1253-f67f-411b-83d2-4e866d3d8efc",
+          "inputFingerprint": "d4308938de991782cead672ba74bcdc6d04b6a9d7646c687ae97bf24a6d01ae2",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "35234315-7000-4681-abc3-78f2f2b16f2b"
+        }
+      ]
+    },
+    "unversioned": [
+      {
+        "id": "78f3abdf-bdfc-4b0a-a4cc-1ed3dc3e6e9a",
+        "scope": "project",
+        "report": "C:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\composition\\.hyperframes\\artifacts\\checks\\78f3abdf-bdfc-4b0a-a4cc-1ed3dc3e6e9a.json",
+        "metadata": {
+          "ok": true,
+          "browserSkipped": false,
+          "options": {
+            "samples": 9,
+            "atTransitions": false,
+            "maxIssues": 80,
+            "collapseStatic": true,
+            "tolerance": 2,
+            "timeout": 3000,
+            "contrast": true,
+            "strict": false,
+            "snapshots": false,
+            "browserGpuMode": "auto"
+          }
+        },
+        "createdAt": 1792695679944,
+        "contentHash": "f68a7d18068f7055fc03b3578f1f23b566100173cc4ef2927ed6c67f2715d491",
+        "revision": null,
+        "inputFingerprint": "bed2867ccbb9cd6e0caedd2287c2126dc4286b110fdf582f006c5ee1faacc47f",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "35234315-7000-4681-abc3-78f2f2b16f2b",
+      "completedAt": 1792698674550,
+      "output": "c:\\Users\\Asus\\Documents\\Piasa Dekh\\brag-output\\brag.mp4",
+      "status": "completed",
+      "revision": "b08ce108-c6fb-4423-aa3e-0e46545506aa"
+    },
+    "retainedRevisions": [
+      "b08ce108-c6fb-4423-aa3e-0e46545506aa",
+      "7d13c853-3347-4a57-9ae5-155b4faff3bc"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}
