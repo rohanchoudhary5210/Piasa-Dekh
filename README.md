@@ -44,6 +44,44 @@ When a user edits their **Salary**, **Fixed Expenses**, or **Savings Goal** mid-
 
 ---
 
+## 🔄 Day & Payday Rollover (automatic)
+
+Runs on app start, on resume, and just after midnight while the app is open (`runDailyMaintenance`):
+1. **Each finished day** is evaluated once: streak (+1 if within budget, otherwise broken), hero HP (zero-spend +25, under 80% +15, within budget +5, overspend −15/−30), and that day's quests are auto-claimed if completed. A one-line summary is shown on the home screen.
+2. **On payday** the finished cycle is closed and archived (visible in Insights → history), the boss result is paid out, the streak shield is refilled and a new cycle starts with the same salary setup.
+3. **Auto-flow** (if enabled): money left over when the cycle ends moves into the primary savings goal.
+4. Fresh daily quests every day.
+
+## 📲 SMS Rules
+- Debits → expense. Refund / cashback / reversal credits → refund (reduces spending).
+- Salary credits and money received from people are **not** counted as spending.
+
+## 🔔 Notifications
+Two daily reminders are scheduled with the OS (work even when the app is closed): 8:30 PM "log today's spends" and 9:15 PM "any cash spends?". Both follow the Notification Settings screen and quiet hours.
+
+## 💾 Backups
+Backups are protected with a password you choose and can be restored on any phone (Settings → Export / Restore). Copy the backup text somewhere safe.
+
+## 📦 Release Build (Play Store)
+1. Create a keystore once:
+   ```bash
+   keytool -genkey -v -keystore %USERPROFILE%\salaryquest-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias salaryquest
+   ```
+2. Create `android/key.properties` (already git-ignored):
+   ```
+   storePassword=<your store password>
+   keyPassword=<your key password>
+   keyAlias=salaryquest
+   storeFile=C:\\Users\\<you>\\salaryquest-release.jks
+   ```
+3. `flutter build appbundle --release`
+
+Without `key.properties`, release builds fall back to the debug key (OK for testing, not for the Play Store).
+
+**Play Store note:** the app uses `READ_SMS` / `RECEIVE_SMS`. Google Play only allows these after you submit the *Permissions Declaration Form* in Play Console and explain the SMS-based expense tracking use case.
+
+---
+
 ## 📁 Project Architecture
 
 ```

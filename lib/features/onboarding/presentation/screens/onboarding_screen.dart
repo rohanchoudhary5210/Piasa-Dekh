@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,9 +11,6 @@ import 'package:salary_quest/features/budget/domain/models/budget_validation_exc
 import 'package:salary_quest/features/budget/domain/services/cycle_date_calculator.dart';
 import 'package:salary_quest/features/gamification/domain/models/hero_character.dart';
 import 'package:salary_quest/features/home/presentation/providers/salary_quest_provider.dart';
-import 'package:salary_quest/features/home/presentation/screens/home_screen.dart';
-import 'package:salary_quest/features/transactions/domain/models/transaction.dart';
-import 'package:salary_quest/features/transactions/domain/services/sms_parser_service.dart';
 import 'package:salary_quest/features/transactions/presentation/widgets/sms_permission_rationale_sheet.dart';
 import 'package:salary_quest/l10n/app_localizations.dart';
 
@@ -44,13 +42,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _autoTrackSms = true;
   final NativeSmsService _smsService = NativeSmsService();
   String? _errorMessage;
+  Timer? _permissionPromptTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _promptSmsPermissionIfFirstLaunch();
-    });
+    if (!Platform.environment.containsKey('FLUTTER_TEST') &&
+        widget.promptSmsPermissionOnOpen &&
+        widget.onCompleted == null) {
+      _permissionPromptTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _promptSmsPermissionIfFirstLaunch();
+        }
+      });
+    }
   }
 
   Future<void> _promptSmsPermissionIfFirstLaunch() async {
@@ -90,6 +95,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   void dispose() {
+    _permissionPromptTimer?.cancel();
     _nameController.dispose();
     _salaryController.dispose();
     _paydayController.dispose();
@@ -148,62 +154,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         widget.onCompleted!();
         return;
       }
-
-      // Real app runtime: Auto-Track Bank SMS from today (12:00 AM midnight onwards)
-      int syncedCount = 0;
-      if (_autoTrackSms) {
-        try {
-          if (!mounted) return;
-          final hasPerm = await _smsService.checkPermission();
-          bool granted = hasPerm;
-          if (!hasPerm && mounted) {
-            granted = await SmsPermissionRationaleSheet.show(
-              context,
-              smsService: _smsService,
-            );
-          }
-          if (granted) {
-            final todayMessages = await _smsService.syncTodayBankSms();
-            for (final parsed in todayMessages) {
-              if (parsed.amount != null) {
-                await ref.read(salaryQuestProvider.notifier).addTransaction(
-                      amount: parsed.amount!,
-                      title: parsed.cleanedMerchant,
-                      category: parsed.inferredCategory,
-                      customTimestamp: parsed.timestamp,
-                      source: TransactionSource.smsAuto,
-                      explicitDedupeKey: parsed.dedupeKey,
-                      type: parsed.type == ParsedSmsType.credit
-                          ? TransactionType.refund
-                          : TransactionType.expense,
-                    );
-                syncedCount++;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (mounted) {
-        if (syncedCount > 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '⚡ Auto-tracked $syncedCount bank transactions from today (since 12:00 AM)!',
-              ),
-              backgroundColor: AppColors.safeGreen,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
+      // Note: In SalaryQuestApp, `MaterialApp.home` is driven declaratively by
+      // `state.isOnboarded`. Once `completeOnboarding` completes, Riverpod updates
+      // state.isOnboarded to true, and MaterialApp automatically rebuilds with
+      // HomeScreen(). Do NOT call Navigator.pushReplacement here, as that triggers
+      // a concurrent push animation causing `!navigator._debugLocked` crash.
     } on BudgetValidationException catch (e) {
-      setState(() => _errorMessage = e.message);
+      if (mounted) setState(() => _errorMessage = e.message);
     } catch (e) {
-      setState(() => _errorMessage = 'Setup failed: $e');
+      if (mounted) setState(() => _errorMessage = 'Setup failed: $e');
     }
   }
 

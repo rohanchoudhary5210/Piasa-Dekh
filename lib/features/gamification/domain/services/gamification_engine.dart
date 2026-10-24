@@ -155,7 +155,7 @@ class GamificationEngine {
       DailyQuest(
         id: 'quest_under_target',
         title: 'Guardian Shield',
-        description: 'Keep total daily spend under budget today',
+        description: 'Keep total daily spend under budget today (reward added automatically at midnight)',
         type: QuestType.spendUnderAmount,
         targetValue: 1.0,
         progressValue: 0.0,
@@ -165,7 +165,7 @@ class GamificationEngine {
       DailyQuest(
         id: 'quest_no_spend',
         title: 'Iron Will Sanctuary',
-        description: 'Achieve a complete zero-spend day',
+        description: 'Spend nothing today (reward added automatically at midnight)',
         type: QuestType.noSpendDay,
         targetValue: 1.0,
         progressValue: 0.0,

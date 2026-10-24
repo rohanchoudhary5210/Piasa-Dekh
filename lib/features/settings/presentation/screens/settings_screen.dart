@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:salary_quest/core/constants/app_colors.dart';
@@ -10,7 +11,12 @@ import 'package:salary_quest/core/services/local_security_service.dart';
 import 'package:salary_quest/features/transactions/presentation/widgets/sms_tracking_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  final bool isEmbeddedTab;
+
+  const SettingsScreen({
+    super.key,
+    this.isEmbeddedTab = false,
+  });
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -87,7 +93,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           backgroundColor: AppColors.safeGreen,
         ),
       );
-      Navigator.pop(context);
+      if (!widget.isEmbeddedTab && Navigator.of(context).canPop()) {
+        Navigator.pop(context);
+      }
     } on BudgetValidationException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -310,6 +318,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isEmbeddedTab,
         title: const Text('Treasury & Cycle Settings'),
       ),
       body: SingleChildScrollView(
@@ -547,11 +556,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 12),
 
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
+            Material(
+              color: AppColors.surface,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.surfaceBorder),
+                side: const BorderSide(color: AppColors.surfaceBorder),
               ),
               child: Column(
                 children: [
@@ -758,11 +768,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surfaceElevated,
+            Material(
+              color: AppColors.surfaceElevated,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.surfaceBorder),
+                side: const BorderSide(color: AppColors.surfaceBorder),
               ),
               child: Column(
                 children: [
@@ -924,9 +935,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _handleExportBackup(BuildContext context, WidgetRef ref) async {
+    final password = await _askBackupPassword(context);
+    if (password == null || !context.mounted) return;
+
     try {
-      final encryptedData =
-          await ref.read(salaryQuestProvider.notifier).exportBackup();
+      final encryptedData = await ref
+          .read(salaryQuestProvider.notifier)
+          .exportBackup(password: password);
       if (!context.mounted) return;
 
       showDialog(
@@ -937,8 +952,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               Icon(Icons.shield_rounded, color: AppColors.safeGreen),
               SizedBox(width: 8),
-              Text('Encrypted Backup',
-                  style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+              Expanded(
+                child: Text('Encrypted Backup Ready',
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+              ),
             ],
           ),
           content: Column(
@@ -946,7 +963,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Your entire cycle, transactions, and hero progress have been compiled into an AES-encrypted payload:',
+                'Copy this backup and keep it somewhere safe (e.g. email it to yourself or save it in Notes). '
+                'You can restore it on any phone with your backup password.',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
               const SizedBox(height: 12),
@@ -967,6 +985,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                '⚠️ Without the password this backup cannot be opened — not even by us.',
+                style: TextStyle(color: AppColors.warningAmber, fontSize: 11),
+              ),
             ],
           ),
           actions: [
@@ -975,17 +998,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: const Text('Close', style: TextStyle(color: AppColors.textSecondary)),
             ),
             ElevatedButton.icon(
-              icon: const Icon(Icons.check, size: 16),
-              label: const Text('Backup Verified'),
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy Backup'),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.safeGreen),
-              onPressed: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('🔒 Encrypted backup payload verified and ready!'),
-                    backgroundColor: AppColors.safeGreen,
-                  ),
-                );
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: encryptedData));
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🔒 Backup copied. Paste it somewhere safe now.'),
+                      backgroundColor: AppColors.safeGreen,
+                    ),
+                  );
+                }
               },
             ),
           ],
@@ -1003,8 +1029,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// Asks for a backup password (entered twice). Returns null if cancelled.
+  Future<String?> _askBackupPassword(BuildContext context) {
+    final pwController = TextEditingController();
+    final confirmController = TextEditingController();
+    String? error;
+
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('Set Backup Password',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'This password locks your backup. You will need it to restore on this or a new phone.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: pwController,
+                obscureText: true,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(labelText: 'Password (min 6 characters)'),
+              ),
+              TextField(
+                controller: confirmController,
+                obscureText: true,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(labelText: 'Repeat password', errorText: error),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final pw = pwController.text;
+                if (pw.length < 6) {
+                  setDialogState(() => error = 'Use at least 6 characters.');
+                  return;
+                }
+                if (pw != confirmController.text) {
+                  setDialogState(() => error = 'Passwords do not match.');
+                  return;
+                }
+                Navigator.pop(ctx, pw);
+              },
+              child: const Text('Create Backup'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleRestoreBackup(BuildContext context, WidgetRef ref) {
     final controller = TextEditingController();
+    final passwordController = TextEditingController();
 
     showDialog(
       context: context,
@@ -1026,7 +1114,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               maxLines: 4,
               style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Paste iv:ciphertext here...',
+                hintText: 'Paste your backup here...',
                 hintStyle: const TextStyle(color: AppColors.textMuted),
                 filled: true,
                 fillColor: AppColors.surfaceElevated,
@@ -1034,6 +1122,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Backup password',
+                helperText: 'Leave empty only for old backups made without a password',
               ),
             ),
           ],
@@ -1047,13 +1145,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.manaPurple),
             onPressed: () async {
               final text = controller.text.trim();
+              final password = passwordController.text;
               if (text.isEmpty) return;
               Navigator.pop(ctx);
 
               try {
                 final result = await ref
                     .read(salaryQuestProvider.notifier)
-                    .restoreBackup(text);
+                    .restoreBackup(text, password: password);
+                // Bring an older backup up to today (new days / new cycle)
+                await ref.read(salaryQuestProvider.notifier).catchUpOnResume();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

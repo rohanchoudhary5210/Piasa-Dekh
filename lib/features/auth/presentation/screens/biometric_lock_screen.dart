@@ -250,16 +250,24 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> {
                 onPressed: () async {
                   final entered = pinController.text.trim();
                   final sec = widget.securityService ?? LocalSecurityService();
+                  final hasPin = await sec.hasCustomBackupPin();
                   final validPin = await sec.getBackupPin();
                   if (!mounted) return;
-                  if (entered.length == 4 && (entered == validPin || entered == '1234' || entered == '0000')) {
+                  if (!hasPin) {
+                    setDialogState(() {
+                      pinError =
+                          'No backup PIN set yet. Unlock with fingerprint or your phone lock, then set a PIN in Settings.';
+                    });
+                    return;
+                  }
+                  if (entered.length == 4 && entered == validPin) {
                     if (ctx.mounted) {
                       Navigator.pop(ctx);
                     }
                     widget.onUnlocked();
                   } else {
                     setDialogState(() {
-                      pinError = 'Incorrect PIN. Try default (1234)';
+                      pinError = 'Incorrect PIN. Please try again.';
                     });
                   }
                 },

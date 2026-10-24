@@ -12,6 +12,16 @@ enum ParsedSmsType {
   unknown,
 }
 
+/// What kind of money came IN for a credit SMS.
+/// Only [refund] reduces spending; salary and other incoming money must never
+/// be treated as a refund (it would wipe out the month's spending).
+enum CreditKind {
+  none,
+  refund,
+  salary,
+  other,
+}
+
 /// Represents the extracted structured data from an Indian banking SMS or push notification.
 class ParsedSmsResult {
   final bool isFinancial;
@@ -28,6 +38,7 @@ class ParsedSmsResult {
   final TransactionSource source;
   final TransactionCategory inferredCategory;
   final bool isMandateRevoked;
+  final CreditKind creditKind;
 
   const ParsedSmsResult({
     required this.isFinancial,
@@ -44,7 +55,25 @@ class ParsedSmsResult {
     required this.source,
     this.inferredCategory = TransactionCategory.other,
     this.isMandateRevoked = false,
+    this.creditKind = CreditKind.none,
   });
+
+  /// True when this SMS is a refund/cashback/reimbursement that should reduce spending.
+  bool get isRefundCredit =>
+      type == ParsedSmsType.credit && creditKind == CreditKind.refund;
+
+  /// True when this SMS should be recorded against the daily budget:
+  /// money spent (debit) or money given back (refund / cashback).
+  /// Salary and other received money never count as spending.
+  bool get affectsBudget =>
+      isFinancial &&
+      !isIgnored &&
+      amount != null &&
+      (type == ParsedSmsType.debit || isRefundCredit);
+
+  /// True when this SMS announces the monthly salary landing in the account.
+  bool get isSalaryCredit =>
+      type == ParsedSmsType.credit && creditKind == CreditKind.salary;
 
   /// Converts this parsed SMS to a domain [Transaction] ready for ingestion.
   Transaction? toTransaction({
@@ -61,6 +90,7 @@ class ParsedSmsResult {
         txType = TransactionType.expense;
         break;
       case ParsedSmsType.credit:
+        if (creditKind != CreditKind.refund) return null;
         txType = TransactionType.refund;
         break;
       default:
@@ -127,6 +157,25 @@ class SmsParserService {
     r'\b(credited|refunded|refund|salary|deposited|received|cashback)\b',
     caseSensitive: false,
   );
+
+  // Credits that genuinely give spent money back
+  static final RegExp _refundCreditRegex = RegExp(
+    r'\b(refund|refunded|reversal|cashback|cash back|chargeback|reimburse|reimbursed|reimbursement)\b',
+    caseSensitive: false,
+  );
+
+  // Salary / payroll credits
+  static final RegExp _salaryCreditRegex = RegExp(
+    r'\b(salary|sal cr|sal credit|payroll|wages)\b',
+    caseSensitive: false,
+  );
+
+  /// Classifies an incoming-money SMS body.
+  static CreditKind classifyCredit(String body) {
+    if (_salaryCreditRegex.hasMatch(body)) return CreditKind.salary;
+    if (_refundCreditRegex.hasMatch(body)) return CreditKind.refund;
+    return CreditKind.other;
+  }
 
   // Priority amount patterns for Mandate / AutoPay sent amounts:
   // e.g. "Sent amount Rs 499.00", "Amount sent: Rs. 149", "Rs. 499 sent", "debited Rs 1200"
@@ -332,6 +381,9 @@ class SmsParserService {
       dedupeKey: dedupeKey,
       source: source,
       inferredCategory: inferredCat,
+      creditKind: smsType == ParsedSmsType.credit
+          ? classifyCredit(lowerBody)
+          : CreditKind.none,
     );
   }
 

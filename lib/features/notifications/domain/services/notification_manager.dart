@@ -54,6 +54,60 @@ class NotificationManager {
     return decision;
   }
 
+  static const int idDailyLogReminder = 2001;
+  static const int idDailyCashReminder = 2002;
+  static const int dailyLogReminderHour = 20;
+  static const int dailyLogReminderMinute = 30;
+  static const int dailyCashReminderHour = 21;
+  static const int dailyCashReminderMinute = 15;
+
+  /// (Re)schedules the repeating daily reminders according to current preferences.
+  /// These fire even when the app is closed. Reminders falling inside quiet
+  /// hours are not scheduled.
+  Future<void> syncDailyReminders() async {
+    try {
+      if (!preferences.enabled) {
+        await _service.cancel(idDailyLogReminder);
+        await _service.cancel(idDailyCashReminder);
+        return;
+      }
+
+      if (preferences.streakAtRiskAlertEnabled &&
+          !preferences.isQuietHour(dailyLogReminderHour)) {
+        await _service.scheduleDailyNotification(
+          id: idDailyLogReminder,
+          hour: dailyLogReminderHour,
+          minute: dailyLogReminderMinute,
+          title: '🔥 Keep your streak alive',
+          body: 'Log today\'s spends in SalaryQuest before midnight to protect your streak.',
+        );
+      } else {
+        await _service.cancel(idDailyLogReminder);
+      }
+
+      if (preferences.cashReminderEnabled &&
+          !preferences.isQuietHour(dailyCashReminderHour)) {
+        await _service.scheduleDailyNotification(
+          id: idDailyCashReminder,
+          hour: dailyCashReminderHour,
+          minute: dailyCashReminderMinute,
+          title: '📝 Any cash spends today?',
+          body: 'Paid with cash or offline today? Add it now so your daily budget stays accurate.',
+        );
+      } else {
+        await _service.cancel(idDailyCashReminder);
+      }
+    } catch (_) {
+      // Never let reminder scheduling break the app
+    }
+  }
+
+  Future<void> cancelAll() async {
+    try {
+      await _service.cancelAll();
+    } catch (_) {}
+  }
+
   void updatePreferences(NotificationPreferences newPreferences) {
     preferences = newPreferences;
   }

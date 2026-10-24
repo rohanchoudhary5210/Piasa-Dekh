@@ -245,7 +245,42 @@ class AppDatabase extends _$AppDatabase {
       beforeOpen: (details) async {
         // Enforce foreign key constraints
         await customStatement('PRAGMA foreign_keys = ON');
+        // Lightweight key-value store for app preferences and progress markers
+        // (language, notification prefs, hero cosmetics, day-processing cursor).
+        // Created with raw SQL so it needs no drift code generation and works on
+        // both fresh installs and upgraded databases.
+        await customStatement(
+          'CREATE TABLE IF NOT EXISTS app_kv_store ('
+          'k TEXT NOT NULL PRIMARY KEY, v TEXT NOT NULL)',
+        );
       },
     );
+  }
+
+  /// Reads a value from the key-value store, or null if absent.
+  Future<String?> readKv(String key) async {
+    final row = await customSelect(
+      'SELECT v FROM app_kv_store WHERE k = ?',
+      variables: [Variable.withString(key)],
+    ).getSingleOrNull();
+    return row?.read<String>('v');
+  }
+
+  /// Inserts or replaces a value in the key-value store.
+  Future<void> writeKv(String key, String value) async {
+    await customStatement(
+      'INSERT OR REPLACE INTO app_kv_store (k, v) VALUES (?, ?)',
+      [key, value],
+    );
+  }
+
+  /// Removes a single key from the key-value store.
+  Future<void> deleteKv(String key) async {
+    await customStatement('DELETE FROM app_kv_store WHERE k = ?', [key]);
+  }
+
+  /// Removes every key from the key-value store.
+  Future<void> clearKv() async {
+    await customStatement('DELETE FROM app_kv_store');
   }
 }

@@ -178,11 +178,18 @@ class RecentTransactionsList extends StatelessWidget {
                       ? '+'
                       : '-';
 
-              return Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: onEdit != null ? () => onEdit!(tx) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
                     decoration: BoxDecoration(
                       color: AppColors.surfaceElevated,
                       borderRadius: BorderRadius.circular(10),
@@ -279,7 +286,10 @@ class RecentTransactionsList extends StatelessWidget {
                       onPressed: () => onDelete!(tx.id),
                     ),
                 ],
-              );
+              ),
+            ),
+          ),
+        );
             },
           ),
         ],

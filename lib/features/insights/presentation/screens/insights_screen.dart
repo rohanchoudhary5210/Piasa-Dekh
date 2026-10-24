@@ -15,7 +15,12 @@ import 'package:salary_quest/features/insights/presentation/widgets/statement_ex
 import 'package:salary_quest/features/transactions/domain/models/transaction.dart';
 
 class InsightsScreen extends ConsumerStatefulWidget {
-  const InsightsScreen({super.key});
+  final bool isEmbeddedTab;
+
+  const InsightsScreen({
+    super.key,
+    this.isEmbeddedTab = false,
+  });
 
   @override
   ConsumerState<InsightsScreen> createState() => _InsightsScreenState();
@@ -89,6 +94,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isEmbeddedTab,
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: false,

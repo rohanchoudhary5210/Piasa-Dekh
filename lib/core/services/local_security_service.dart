@@ -141,6 +141,78 @@ class LocalSecurityService {
     return await encrypt(plainText);
   }
 
+  // ---------------------------------------------------------------------------
+  // PASSWORD-PROTECTED BACKUPS (portable to a new phone)
+  // ---------------------------------------------------------------------------
+
+  static const String passwordBackupPrefix = 'pw1:';
+  static const int _pbkdf2Iterations = 20000;
+
+  /// Whether the ciphertext was produced by [encryptWithPassword].
+  static bool isPasswordProtected(String cipherText) =>
+      cipherText.trim().startsWith(passwordBackupPrefix);
+
+  /// PBKDF2-HMAC-SHA256 key derivation.
+  static Uint8List deriveKeyFromPassword(
+    String password,
+    List<int> salt, {
+    int iterations = _pbkdf2Iterations,
+    int keyLength = 32,
+  }) {
+    final hmac = Hmac(sha256, utf8.encode(password));
+    final output = <int>[];
+    var blockIndex = 1;
+    while (output.length < keyLength) {
+      final blockBytes = <int>[
+        (blockIndex >> 24) & 0xff,
+        (blockIndex >> 16) & 0xff,
+        (blockIndex >> 8) & 0xff,
+        blockIndex & 0xff,
+      ];
+      var u = hmac.convert(<int>[...salt, ...blockBytes]).bytes;
+      final t = List<int>.from(u);
+      for (var i = 1; i < iterations; i++) {
+        u = hmac.convert(u).bytes;
+        for (var j = 0; j < t.length; j++) {
+          t[j] ^= u[j];
+        }
+      }
+      output.addAll(t);
+      blockIndex++;
+    }
+    return Uint8List.fromList(output.sublist(0, keyLength));
+  }
+
+  /// Encrypts with a key derived from the user's password, so the backup can be
+  /// restored on any phone (it does not depend on this device's keystore).
+  /// Format: `pw1:${salt}:${iv}:${cipher}` (all base64).
+  Future<String> encryptWithPassword(String plainText, String password) async {
+    final salt = enc.IV.fromSecureRandom(16).bytes;
+    final key = enc.Key(deriveKeyFromPassword(password, salt));
+    final iv = enc.IV.fromSecureRandom(16);
+    final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
+    final encrypted = encrypter.encrypt(plainText, iv: iv);
+    return '$passwordBackupPrefix${base64Encode(salt)}:${iv.base64}:${encrypted.base64}';
+  }
+
+  /// Decrypts a [encryptWithPassword] payload. Throws [FormatException] when
+  /// the password is wrong or the data was altered.
+  Future<String> decryptWithPassword(String cipherText, String password) async {
+    final parts = cipherText.trim().split(':');
+    if (parts.length != 4 || '${parts[0]}:' != passwordBackupPrefix) {
+      throw const FormatException('Not a password-protected backup.');
+    }
+    try {
+      final salt = base64Decode(parts[1]);
+      final key = enc.Key(deriveKeyFromPassword(password, salt));
+      final iv = enc.IV.fromBase64(parts[2]);
+      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
+      return encrypter.decrypt64(parts[3], iv: iv);
+    } catch (_) {
+      throw const FormatException('Wrong password or corrupted backup.');
+    }
+  }
+
   /// Whether the ciphertext is in authenticated AES-GCM format.
   bool isGcm(String cipherText) => cipherText.startsWith('gcm:');
 
@@ -171,6 +243,23 @@ class LocalSecurityService {
       if (pin != null && pin.isNotEmpty) return pin;
     } catch (_) {}
     return '1234';
+  }
+
+  /// Whether the user has set their own backup PIN in Settings.
+  /// The lock screen only accepts a PIN the user actually chose — there is no
+  /// built-in default PIN that could unlock someone else's vault.
+  Future<bool> hasCustomBackupPin() async {
+    final fallback = _memoryFallback;
+    try {
+      if (fallback != null) {
+        final pin = fallback[_pinStorageAlias];
+        return pin != null && pin.isNotEmpty;
+      }
+      final pin = await _secureStorage.read(key: _pinStorageAlias);
+      return pin != null && pin.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Sets or updates the 4-digit backup PIN in secure storage.

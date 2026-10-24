@@ -4,20 +4,60 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get darkTheme {
+  static ThemeData get darkTheme => forTheme('mana_purple');
+
+  /// Primary accent for a coin-shop theme id.
+  static Color accentFor(String themeId) {
+    switch (themeId) {
+      case 'emerald_grove':
+        return const Color(0xFF10B981);
+      case 'cyberpunk_neon':
+        return const Color(0xFF22D3EE);
+      case 'obsidian_gold':
+        return const Color(0xFFFBBF24);
+      case 'mana_purple':
+      default:
+        return AppColors.manaPurple;
+    }
+  }
+
+  /// Secondary accent for a coin-shop theme id.
+  static Color secondaryFor(String themeId) {
+    switch (themeId) {
+      case 'emerald_grove':
+        return const Color(0xFF84CC16);
+      case 'cyberpunk_neon':
+        return const Color(0xFFF472B6);
+      case 'obsidian_gold':
+        return const Color(0xFFD4AF37);
+      case 'mana_purple':
+      default:
+        return AppColors.safeGreen;
+    }
+  }
+
+  /// App theme for the equipped coin-shop theme.
+  static ThemeData forTheme(String themeId) {
+    final accent = accentFor(themeId);
+    final secondary = secondaryFor(themeId);
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.background,
-      primaryColor: AppColors.manaPurple,
+      primaryColor: accent,
       cardColor: AppColors.surface,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.manaPurple,
-        secondary: AppColors.safeGreen,
+      colorScheme: ColorScheme.dark(
+        primary: accent,
+        secondary: secondary,
         surface: AppColors.surface,
         error: AppColors.dangerRed,
         onPrimary: Colors.white,
         onSecondary: Colors.black,
         onSurface: AppColors.textPrimary,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: accent),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: accent,
+        foregroundColor: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,

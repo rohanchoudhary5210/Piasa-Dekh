@@ -45,6 +45,7 @@ class BackupRestoreService {
   static Future<String> exportEncryptedBackup({
     required SalaryQuestState state,
     required LocalSecurityService securityService,
+    String? password,
   }) async {
     final payloadMap = {
       'schemaVersion': currentSchemaVersion,
@@ -67,6 +68,10 @@ class BackupRestoreService {
     };
 
     final plainJson = jsonEncode(payloadMap);
+    if (password != null && password.isNotEmpty) {
+      // Portable: works on a new phone with the same password
+      return await securityService.encryptWithPassword(plainJson, password);
+    }
     return await securityService.encrypt(plainJson);
   }
 
@@ -76,6 +81,7 @@ class BackupRestoreService {
     required String encryptedData,
     required SalaryQuestState currentState,
     required LocalSecurityService securityService,
+    String? password,
   }) async {
     if (encryptedData.trim().isEmpty) {
       throw const BackupValidationException('Encrypted backup string is empty.');
@@ -83,7 +89,19 @@ class BackupRestoreService {
 
     String plainJson;
     try {
-      plainJson = await securityService.decrypt(encryptedData);
+      if (LocalSecurityService.isPasswordProtected(encryptedData)) {
+        if (password == null || password.isEmpty) {
+          throw const BackupDecryptionException(
+            'This backup is password-protected. Enter the backup password.',
+          );
+        }
+        plainJson = await securityService.decryptWithPassword(
+            encryptedData.trim(), password);
+      } else {
+        plainJson = await securityService.decrypt(encryptedData.trim());
+      }
+    } on BackupDecryptionException {
+      rethrow;
     } catch (e) {
       throw BackupDecryptionException(
         'Decryption failed: invalid security key or corrupted backup data. ($e)',

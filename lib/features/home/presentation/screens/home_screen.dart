@@ -1,17 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:salary_quest/core/constants/app_colors.dart';
+import 'package:salary_quest/core/constants/app_theme.dart';
 import 'package:salary_quest/core/utils/currency_formatter.dart';
+import 'package:salary_quest/features/budget/domain/models/daily_budget.dart';
 import 'package:salary_quest/features/home/presentation/providers/salary_quest_provider.dart';
-import 'package:salary_quest/core/services/biometric_auth_service.dart';
-import 'package:salary_quest/features/auth/presentation/screens/biometric_lock_screen.dart';
 import 'package:salary_quest/features/home/presentation/widgets/hero_character_card.dart';
 import 'package:salary_quest/features/home/presentation/widgets/daily_budget_card.dart';
 import 'package:salary_quest/features/home/presentation/widgets/calendar_strip.dart';
 import 'package:salary_quest/features/home/presentation/widgets/quests_card.dart';
 import 'package:salary_quest/features/home/presentation/widgets/recent_transactions_list.dart';
 import 'package:salary_quest/features/home/presentation/widgets/add_transaction_sheet.dart';
+import 'package:salary_quest/features/transactions/presentation/widgets/edit_transaction_sheet.dart';
 import 'package:salary_quest/features/settings/presentation/screens/settings_screen.dart';
 import 'package:salary_quest/features/savings_goals/presentation/screens/savings_goals_screen.dart';
 import 'package:salary_quest/features/insights/presentation/screens/insights_screen.dart';
@@ -36,18 +39,48 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final AppLifecycleListener _lifecycleListener;
   final NativeSmsService _smsService = NativeSmsService();
+  Timer? _midnightTimer;
+  int _currentTabIndex = 0;
+
+  void _handleEditTransaction(Transaction tx) {
+    EditTransactionSheet.show(
+      context,
+      transaction: tx,
+      onSave: (updated) {
+        ref.read(salaryQuestProvider.notifier).editTransaction(updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transaction updated & daily budgets rebalanced'),
+            backgroundColor: AppColors.safeGreen,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Fires just after midnight while the app stays open, so the new day
+  /// (streak, quests, payday rollover) starts without needing to reopen the app.
+  void _scheduleMidnightTick() {
+    _midnightTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1, 0, 0, 5);
+    _midnightTimer = Timer(nextMidnight.difference(now), () async {
+      if (!mounted) return;
+      await ref.read(salaryQuestProvider.notifier).catchUpOnResume();
+      _scheduleMidnightTick();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    // Task 7 Security: Locks vault whenever app is sent to background, paused, or viewed in app switcher
+    // Vault locking is handled app-wide by AppLockGate (covers every screen).
+    // Here we only catch up on days / SMS when the app comes back.
     _lifecycleListener = AppLifecycleListener(
-      onHide: _handleAppHidden,
-      onPause: _handleAppHidden,
-      onInactive: _handleAppHidden,
-      onShow: _handleAppResume,
       onResume: _handleAppResume,
     );
+    _scheduleMidnightTick();
 
     // Automated Native SMS Ingestion
     _smsService.startListening(
@@ -69,6 +102,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
 
         if (parsed.amount == null) return;
+
+        // Incoming money that is not a refund (salary, friend transfer, interest)
+        // is NOT spending and must not reduce today's spent amount.
+        if (parsed.type == ParsedSmsType.credit && !parsed.isRefundCredit) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                parsed.isSalaryCredit
+                    ? '💼 Salary credit of ${CurrencyFormatter.formatMoney(parsed.amount!)} detected. Your budget already plans for your salary.'
+                    : 'ℹ️ ${CurrencyFormatter.formatMoney(parsed.amount!)} received — not counted as spending. Add it as extra income in Settings if you want to spend it.',
+              ),
+              backgroundColor: AppColors.manaPurple,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+
         try {
           await ref.read(salaryQuestProvider.notifier).addTransaction(
                 amount: parsed.amount!,
@@ -85,7 +136,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  '⚡ Auto-Tracked: ${CurrencyFormatter.formatMoney(parsed.amount!)} at ${parsed.cleanedMerchant} [${parsed.inferredCategory.displayName}] (+15 XP)',
+                  parsed.isRefundCredit
+                      ? '↩️ Refund tracked: ${CurrencyFormatter.formatMoney(parsed.amount!)} from ${parsed.cleanedMerchant}'
+                      : '⚡ Auto-Tracked: ${CurrencyFormatter.formatMoney(parsed.amount!)} at ${parsed.cleanedMerchant} [${parsed.inferredCategory.displayName}]',
                 ),
                 backgroundColor: AppColors.safeGreen,
                 duration: const Duration(seconds: 4),
@@ -95,21 +148,124 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         } catch (_) {}
       },
     );
+
+    // Instant catch-up on app launch for bank SMS missed while app was closed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showDailySummaryIfAny();
+      _catchUpMissedSmsOnOpen();
+    });
   }
 
-  void _handleAppHidden() {
-    final state = ref.read(salaryQuestProvider);
-    if (state.isBiometricLockEnabled) {
-      ref.read(salaryQuestProvider.notifier).setAuthenticated(false);
+  bool _isCatchingUpSms = false;
+
+  /// Catch-up scan for bank SMS that arrived while the app was closed or dormant.
+  Future<void> _catchUpMissedSmsOnOpen() async {
+    if (_isCatchingUpSms) return;
+    _isCatchingUpSms = true;
+
+    try {
+      final hasPerm = await _smsService.checkPermission();
+      if (!hasPerm) {
+        _isCatchingUpSms = false;
+        return;
+      }
+
+      final state = ref.read(salaryQuestProvider);
+      final cycle = state.cycle;
+      final now = DateTime.now();
+
+      final smsTransactions = state.transactions
+          .where((t) => t.source == TransactionSource.smsAuto && t.cycleId == cycle.id)
+          .toList();
+
+      DateTime scanSince;
+      if (smsTransactions.isNotEmpty) {
+        final latestTs = smsTransactions
+            .map((t) => t.timestamp)
+            .reduce((a, b) => a.isAfter(b) ? a : b);
+        scanSince = latestTs.subtract(const Duration(minutes: 2));
+      } else {
+        scanSince = DateTime(now.year, now.month, now.day);
+      }
+
+      if (scanSince.isBefore(cycle.startDate)) {
+        scanSince = cycle.startDate;
+      }
+
+      final missedList = await _smsService.syncBankSmsSince(scanSince, limit: 100);
+      int imported = 0;
+
+      for (final parsed in missedList) {
+        // Only spending and refunds affect the budget; salary / money received is skipped.
+        final affectsBudget = parsed.type == ParsedSmsType.debit ||
+            parsed.isRefundCredit;
+        if (affectsBudget &&
+            parsed.isFinancial &&
+            !parsed.isIgnored &&
+            parsed.amount != null) {
+          try {
+            await ref.read(salaryQuestProvider.notifier).addTransaction(
+                  amount: parsed.amount!,
+                  title: parsed.cleanedMerchant,
+                  category: parsed.inferredCategory,
+                  customTimestamp: parsed.timestamp,
+                  source: TransactionSource.smsAuto,
+                  explicitDedupeKey: parsed.dedupeKey,
+                  type: parsed.type == ParsedSmsType.credit
+                      ? TransactionType.refund
+                      : TransactionType.expense,
+                );
+            imported++;
+          } catch (_) {
+            // Duplicate or already recorded - safely skipped
+          }
+        }
+      }
+
+      if (mounted && imported > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '⚡ Instant Sync: $imported new transaction${imported > 1 ? 's' : ''} auto-updated!',
+            ),
+            backgroundColor: AppColors.safeGreen,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (_) {
+      // Gracefully ignore
+    } finally {
+      _isCatchingUpSms = false;
     }
   }
 
-  void _handleAppResume() {
-    ref.read(salaryQuestProvider.notifier).catchUpOnResume();
+  Future<void> _handleAppResume() async {
+    await ref.read(salaryQuestProvider.notifier).catchUpOnResume();
+    _scheduleMidnightTick();
+    _catchUpMissedSmsOnOpen();
+  }
+
+  /// Shows the one-time "what happened since yesterday" message
+  /// (streak, HP, auto-claimed quests, new salary cycle).
+  void _showDailySummaryIfAny() {
+    if (!mounted) return;
+    final summary = ref.read(salaryQuestProvider).dailySummary;
+    if (summary == null || summary.isEmpty) return;
+    ref.read(salaryQuestProvider.notifier).clearDailySummary();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(summary),
+        backgroundColor: AppColors.surfaceElevated,
+        duration: const Duration(seconds: 6),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _midnightTimer?.cancel();
     _smsService.stopListening();
     _lifecycleListener.dispose();
     super.dispose();
@@ -167,26 +323,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _openSettingsScreen(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(salaryQuestProvider);
+    final accent = AppTheme.accentFor(state.hero.themeId);
 
-    // If biometric lock is enabled and session is not authenticated, show lock screen
-    if (state.isBiometricLockEnabled && !state.isAuthenticated) {
-      return BiometricLockScreen(
-        authService: BiometricAuthService(),
-        onUnlocked: () {
-          ref.read(salaryQuestProvider.notifier).setAuthenticated(true);
-        },
-      );
-    }
+    // Day/month change summaries can arrive at any time (resume, midnight tick)
+    ref.listen<String?>(
+      salaryQuestProvider.select((s) => s.dailySummary),
+      (previous, next) {
+        if (next != null) {
+          WidgetsBinding.instance
+              .addPostFrameCallback((_) => _showDailySummaryIfAny());
+        }
+      },
+    );
 
     final todayBudget = state.todayBudget;
     final bossHpRatio =
@@ -204,6 +355,118 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final reduceMotion =
         state.isReduceMotion || MediaQuery.of(context).disableAnimations;
 
+    return PopScope(
+      canPop: _currentTabIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _currentTabIndex != 0) {
+          setState(() => _currentTabIndex = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: IndexedStack(
+          index: _currentTabIndex,
+          children: [
+            _buildDashboardView(
+              context,
+              state,
+              accent,
+              startStr,
+              endStr,
+              todayBudget,
+              bossHpRatio,
+              prediction,
+              reduceMotion,
+            ),
+            const TransactionsScreen(isEmbeddedTab: true),
+            const InsightsScreen(isEmbeddedTab: true),
+            const SavingsGoalsScreen(isEmbeddedTab: true),
+            const SettingsScreen(isEmbeddedTab: true),
+          ],
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        floatingActionButton: (_currentTabIndex == 0 || _currentTabIndex == 1)
+            ? FloatingActionButton.extended(
+                key: const Key('btn_log_expense'),
+                onPressed: () => _openAddTransactionSheet(context),
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                elevation: 6,
+                icon: const Icon(Icons.add_rounded, color: Colors.black, size: 22),
+                label: const Text(
+                  'LOG EXPENSE',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              )
+            : null,
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              top: BorderSide(
+                color: AppColors.surfaceBorder.withValues(alpha: 0.6),
+                width: 1,
+              ),
+            ),
+          ),
+          child: NavigationBar(
+            backgroundColor: AppColors.surface,
+            indicatorColor: AppColors.manaPurple.withValues(alpha: 0.22),
+            selectedIndex: _currentTabIndex,
+            height: 64,
+            elevation: 0,
+            onDestinationSelected: (index) {
+              setState(() => _currentTabIndex = index);
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined, color: AppColors.textSecondary, size: 22),
+                selectedIcon: Icon(Icons.dashboard_rounded, color: AppColors.manaPurple, size: 22),
+                label: 'Dashboard',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.receipt_long_outlined, color: AppColors.textSecondary, size: 22),
+                selectedIcon: Icon(Icons.receipt_long_rounded, color: AppColors.manaPurple, size: 22),
+                label: 'Activity',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.auto_graph_outlined, color: AppColors.textSecondary, size: 22),
+                selectedIcon: Icon(Icons.auto_graph_rounded, color: AppColors.manaPurple, size: 22),
+                label: 'Insights',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.flag_outlined, color: AppColors.textSecondary, size: 22),
+                selectedIcon: Icon(Icons.flag_rounded, color: AppColors.manaPurple, size: 22),
+                label: 'Goals',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.tune_outlined, color: AppColors.textSecondary, size: 22),
+                selectedIcon: Icon(Icons.tune_rounded, color: AppColors.manaPurple, size: 22),
+                label: 'Settings',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardView(
+    BuildContext context,
+    SalaryQuestState state,
+    Color accent,
+    String startStr,
+    String endStr,
+    DailyBudget todayBudget,
+    double bossHpRatio,
+    MonthEndPrediction prediction,
+    bool reduceMotion,
+  ) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -213,13 +476,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'SALARYQUEST',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.2,
                 fontSize: 16,
-                color: AppColors.textPrimary,
+                color: accent,
               ),
             ),
             const SizedBox(height: 1),
@@ -247,10 +510,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: Icons.auto_graph_rounded,
             tooltip: 'Financial Insights',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const InsightsScreen()),
-              );
+              setState(() => _currentTabIndex = 2);
             },
           ),
           const SizedBox(width: 8),
@@ -258,17 +518,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: Icons.flag_outlined,
             tooltip: 'Savings Goals',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SavingsGoalsScreen()),
-              );
+              setState(() => _currentTabIndex = 3);
             },
           ),
           const SizedBox(width: 8),
           _buildAppBarAction(
             icon: Icons.tune_rounded,
             tooltip: 'Settings',
-            onTap: () => _openSettingsScreen(context),
+            onTap: () {
+              setState(() => _currentTabIndex = 4);
+            },
           ),
           const SizedBox(width: 16),
         ],
@@ -339,11 +598,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const InsightsScreen()),
-                        );
+                        setState(() => _currentTabIndex = 2);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16),
@@ -537,8 +792,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       minHeight: 4,
                                       backgroundColor: const Color(0xFF222228),
                                       valueColor:
-                                          const AlwaysStoppedAnimation<Color>(
-                                        AppColors.manaPurple,
+                                          AlwaysStoppedAnimation<Color>(
+                                        accent,
                                       ),
                                     ),
                                   ),
@@ -730,13 +985,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               RecentTransactionsList(
                 transactions: state.transactions,
                 onViewAll: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const TransactionsScreen(),
-                    ),
-                  );
+                  setState(() => _currentTabIndex = 1);
                 },
+                onEdit: (tx) => _handleEditTransaction(tx),
                 onDelete: (id) async {
                   final deleted = await ref
                       .read(salaryQuestProvider.notifier)
@@ -767,40 +1018,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Container(
-        height: 52,
-        margin: const EdgeInsets.symmetric(horizontal: 24),
-        child: ElevatedButton(
-          onPressed: () => _openAddTransactionSheet(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            elevation: 8,
-            shadowColor: Colors.white.withValues(alpha: 0.25),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(100),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_rounded, color: Colors.black, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'LOG EXPENSE',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -811,21 +1028,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }) {
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.surfaceBorder,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.surfaceBorder,
+              ),
             ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 19, color: AppColors.textPrimary),
           ),
-          alignment: Alignment.center,
-          child: Icon(icon, size: 17, color: AppColors.textPrimary),
         ),
       ),
     );

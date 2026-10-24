@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:salary_quest/core/constants/app_colors.dart';
+import 'package:salary_quest/core/models/money.dart';
 import 'package:salary_quest/core/utils/currency_formatter.dart';
 import 'package:salary_quest/features/home/presentation/providers/salary_quest_provider.dart';
 import 'package:salary_quest/features/transactions/domain/models/transaction.dart';
@@ -19,7 +20,12 @@ enum DateFilterOption {
 }
 
 class TransactionsScreen extends ConsumerStatefulWidget {
-  const TransactionsScreen({super.key});
+  final bool isEmbeddedTab;
+
+  const TransactionsScreen({
+    super.key,
+    this.isEmbeddedTab = false,
+  });
 
   @override
   ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -129,6 +135,77 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     );
   }
 
+  /// Records money a friend paid back for a split bill.
+  Future<void> _handleMarkPaidBack(Transaction tx) async {
+    final pending = tx.pendingReimbursement ?? const Money.zero();
+    final controller =
+        TextEditingController(text: pending.inRupees.toStringAsFixed(0));
+
+    final amount = await showDialog<Money>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Money paid back',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How much did you get back for "${tx.title}"? (${CurrencyFormatter.formatMoney(pending)} pending)',
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: const InputDecoration(prefixText: '₹ '),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final parsed = Money.tryParse(controller.text.trim());
+              if (parsed == null || !parsed.isPositive) return;
+              Navigator.pop(ctx, parsed > pending ? pending : parsed);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (amount == null || !mounted) return;
+    try {
+      await ref.read(salaryQuestProvider.notifier).recordSplitReimbursement(
+            parentTransactionId: tx.id,
+            reimbursementAmount: amount,
+            note: 'Paid back: ${tx.title}',
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${CurrencyFormatter.formatMoney(amount)} paid back recorded'),
+          backgroundColor: AppColors.safeGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not record: $e'),
+          backgroundColor: AppColors.dangerRed,
+        ),
+      );
+    }
+  }
+
   void _handleEdit(Transaction tx) {
     EditTransactionSheet.show(
       context,
@@ -158,6 +235,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isEmbeddedTab,
         title: const Text(
           'Transactions',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -537,6 +615,26 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           fontSize: 11,
                         ),
                       ),
+                      if (tx.type == TransactionType.splitShare &&
+                          !tx.isReimbursement &&
+                          (tx.pendingReimbursement?.isPositive ?? false))
+                        GestureDetector(
+                          key: Key('btn_mark_paid_back_${tx.id}'),
+                          onTap: () => _handleMarkPaidBack(tx),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '${CurrencyFormatter.formatMoney(tx.pendingReimbursement!)} pending • Tap to mark paid back',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.coinGold,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

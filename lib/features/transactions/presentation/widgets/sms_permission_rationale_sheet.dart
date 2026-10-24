@@ -29,8 +29,16 @@ class SmsPermissionRationaleSheet extends StatefulWidget {
       ),
       builder: (ctx) => SmsPermissionRationaleSheet(
         smsService: smsService,
-        onGranted: () => Navigator.pop(ctx, true),
-        onDenied: () => Navigator.pop(ctx, false),
+        onGranted: () {
+          if (Navigator.of(ctx).canPop()) {
+            Navigator.of(ctx).pop(true);
+          }
+        },
+        onDenied: () {
+          if (Navigator.of(ctx).canPop()) {
+            Navigator.of(ctx).pop(false);
+          }
+        },
       ),
     );
     return result ?? false;
@@ -46,6 +54,7 @@ class _SmsPermissionRationaleSheetState
   bool _isRequesting = false;
 
   Future<void> _handleAllow() async {
+    if (_isRequesting) return;
     setState(() => _isRequesting = true);
     try {
       final granted = await widget.smsService.requestPermission();
@@ -57,8 +66,6 @@ class _SmsPermissionRationaleSheetState
       }
     } catch (_) {
       if (mounted) widget.onDenied?.call();
-    } finally {
-      if (mounted) setState(() => _isRequesting = false);
     }
   }
 

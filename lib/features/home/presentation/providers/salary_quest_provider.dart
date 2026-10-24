@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:salary_quest/core/database/app_database.dart';
+import 'package:salary_quest/core/database/database_failure_exception.dart';
 import 'package:salary_quest/core/database/salary_quest_repository.dart';
 import 'package:salary_quest/core/models/money.dart';
 import 'package:salary_quest/core/services/backup_restore_service.dart';
@@ -57,6 +60,16 @@ class SalaryQuestState {
   final bool isOnboarded;
   final String languageCode;
 
+  /// True while saved data is being loaded from the database at startup.
+  final bool isLoading;
+
+  /// Set when the saved data could not be loaded (the app must not fall back to demo data).
+  final String? loadError;
+
+  /// One-time message summarising what happened at day/month change
+  /// (streak, HP, auto-claimed quest rewards, new cycle). Shown once by the home screen.
+  final String? dailySummary;
+
   const SalaryQuestState({
     required this.cycle,
     required this.dailyBudgets,
@@ -80,6 +93,9 @@ class SalaryQuestState {
     this.achievements = const [],
     this.isOnboarded = true,
     this.languageCode = 'en',
+    this.isLoading = false,
+    this.loadError,
+    this.dailySummary,
   });
 
   DailyBudget get todayBudget {
@@ -149,6 +165,12 @@ class SalaryQuestState {
     List<Achievement>? achievements,
     bool? isOnboarded,
     String? languageCode,
+    bool? isLoading,
+    String? loadError,
+    bool clearLoadError = false,
+    String? dailySummary,
+    bool clearDailySummary = false,
+    bool clearAutoFlowGoalId = false,
   }) {
     return SalaryQuestState(
       cycle: cycle ?? this.cycle,
@@ -173,10 +195,16 @@ class SalaryQuestState {
       savingsGoals: savingsGoals ?? this.savingsGoals,
       isAutoFlowSavingsEnabled:
           isAutoFlowSavingsEnabled ?? this.isAutoFlowSavingsEnabled,
-      autoFlowGoalId: autoFlowGoalId ?? this.autoFlowGoalId,
+      autoFlowGoalId: clearAutoFlowGoalId
+          ? null
+          : (autoFlowGoalId ?? this.autoFlowGoalId),
       achievements: achievements ?? this.achievements,
       isOnboarded: isOnboarded ?? this.isOnboarded,
       languageCode: languageCode ?? this.languageCode,
+      isLoading: isLoading ?? this.isLoading,
+      loadError: clearLoadError ? null : (loadError ?? this.loadError),
+      dailySummary:
+          clearDailySummary ? null : (dailySummary ?? this.dailySummary),
     );
   }
 }
@@ -186,12 +214,16 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
   DateTime? _lastKnownDeviceTimestamp;
   late final NotificationManager notificationManager;
   bool _isOnboardingInProgressOrDone = false;
+  bool _maintenanceRunning = false;
+
+  /// Hard cap on how many cycles are rolled forward in one go (app unused for 2 years).
+  static const int _maxCycleRollovers = 24;
 
   SalaryQuestNotifier({
     SalaryQuestRepository? repository,
     INotificationService? notificationService,
   })  : _repository = repository,
-        super(_buildInitialState()) {
+        super(_buildInitialState(isLoading: repository != null)) {
     notificationManager = NotificationManager(
       service: notificationService ?? FlutterLocalNotificationService(),
       preferences: state.notificationPreferences,
@@ -204,37 +236,467 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     if (repo == null) return;
     try {
       final savedState = await repo.loadPersistedState();
-      final now = DateTime.now();
+      if (!mounted) return;
 
-      if (savedState != null) {
-        final currentDay = savedState.cycle.currentDayIndex(now);
-        final caughtUpBudgets = CycleManagerService.catchUpMissedDays(
-          cycle: savedState.cycle,
-          budgets: savedState.dailyBudgets,
-          lastKnownDayIndex: savedState.currentDayIndex,
-          currentDayIndex: currentDay,
-        );
-
+      if (savedState != null && !_isOnboardingInProgressOrDone) {
         state = savedState.copyWith(
-          currentDayIndex: currentDay,
-          dailyBudgets: caughtUpBudgets,
           isAuthenticated: !savedState.isBiometricLockEnabled,
           isOnboarded: true,
+          isLoading: true, // keep the splash up until today's numbers are ready
+          clearLoadError: true,
         );
+        notificationManager.updatePreferences(savedState.notificationPreferences);
+
+        final savedTs =
+            await repo.readPreference(SalaryQuestRepository.kvLastKnownTimestamp);
+        _lastKnownDeviceTimestamp =
+            savedTs != null ? DateTime.tryParse(savedTs) : null;
+
+        await runDailyMaintenance();
+        if (!mounted) return;
+        state = state.copyWith(isLoading: false);
+        await _initNotifications();
       } else {
-        // App is opened for the first time on a fresh device!
-        // Direct the user to OnboardingScreen if onboarding hasn't been completed in the meantime.
-        if (!_isOnboardingInProgressOrDone) {
-          state = state.copyWith(isOnboarded: false);
-        }
+        // First launch on this device: show onboarding (unless it already started).
+        state = state.copyWith(
+          isOnboarded: _isOnboardingInProgressOrDone ? state.isOnboarded : false,
+          isLoading: false,
+          clearLoadError: true,
+        );
       }
-      _lastKnownDeviceTimestamp = now;
-    } catch (_) {
-      // In-memory fallback
+    } catch (e) {
+      // Never silently fall back to demo data: surface the error so the user can retry.
+      if (!mounted) return;
+      state = state.copyWith(
+        isLoading: false,
+        loadError: e is DatabaseFailureException ? e.userMessage : e.toString(),
+      );
     }
   }
 
-  static SalaryQuestState _buildInitialState() {
+  /// Retries loading saved data after a startup failure.
+  Future<void> retryLoad() async {
+    state = state.copyWith(isLoading: true, clearLoadError: true);
+    await _initPersistenceAndCatchUp();
+  }
+
+  Future<void> _initNotifications() async {
+    try {
+      await notificationManager.initialize();
+      await notificationManager.syncDailyReminders();
+    } catch (_) {}
+  }
+
+  /// Clears the one-time day/month summary after the UI has shown it.
+  void clearDailySummary() {
+    if (state.dailySummary != null) {
+      state = state.copyWith(clearDailySummary: true);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // DAY & MONTH ROLLOVER
+  // ---------------------------------------------------------------------------
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  static String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Reads the "last fully processed day" cursor for the active cycle.
+  /// Returns null when there is no cursor for this cycle yet.
+  Future<int?> _readDayCursor(String cycleId) async {
+    final repo = _repository;
+    if (repo == null) return _memoryCursor[cycleId];
+    final raw = await repo.readPreference(SalaryQuestRepository.kvDayCursor);
+    if (raw == null) return null;
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      if (json['cycleId'] != cycleId) return null;
+      return json['day'] as int?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final Map<String, int> _memoryCursor = {};
+
+  Future<void> _writeDayCursor(String cycleId, int day) async {
+    _memoryCursor
+      ..clear()
+      ..[cycleId] = day;
+    final repo = _repository;
+    if (repo == null) return;
+    await repo.savePreference(
+      SalaryQuestRepository.kvDayCursor,
+      jsonEncode({'cycleId': cycleId, 'day': day}),
+    );
+  }
+
+  String? _memoryQuestsDate;
+
+  Future<String?> _readQuestsDate() async {
+    final repo = _repository;
+    if (repo == null) return _memoryQuestsDate;
+    return repo.readPreference(SalaryQuestRepository.kvQuestsDate);
+  }
+
+  Future<void> _writeQuestsDate(DateTime day) async {
+    _memoryQuestsDate = _dateKey(day);
+    final repo = _repository;
+    if (repo == null) return;
+    await repo.savePreference(
+        SalaryQuestRepository.kvQuestsDate, _dateKey(day));
+  }
+
+  Future<void> _rememberDeviceTimestamp(DateTime ts) async {
+    _lastKnownDeviceTimestamp = ts;
+    final repo = _repository;
+    if (repo == null) return;
+    try {
+      await repo.savePreference(
+          SalaryQuestRepository.kvLastKnownTimestamp, ts.toIso8601String());
+    } catch (_) {}
+  }
+
+  /// Runs everything that must happen when days pass:
+  /// 1. If the salary cycle has ended, closes it, sweeps leftover money into the
+  ///    primary savings goal (when auto-flow is on), archives it and starts the next cycle.
+  /// 2. For every day that finished since the last run: updates the streak and hero HP
+  ///    once per day, and auto-claims that day's completed quests.
+  /// 3. Gives the user fresh daily quests for today.
+  /// Safe to call repeatedly (app start, resume, after a payday change).
+  Future<void> runDailyMaintenance({DateTime? now}) async {
+    if (_maintenanceRunning || !state.isOnboarded) return;
+    _maintenanceRunning = true;
+    try {
+      final current = now ?? DateTime.now();
+      final today = _dateOnly(current);
+      final summary = <String>[];
+
+      // Device-clock integrity: if the clock jumped backwards, skip rewards this run.
+      final clockTampered = ClockIntegrityService.isClockManipulated(
+        currentTimestamp: current,
+        lastKnownTimestamp: _lastKnownDeviceTimestamp,
+      );
+      if (clockTampered) {
+        // Skip rewards for this run, but accept the new clock so a genuinely
+        // corrected clock can never lock the user out of new days.
+        state = state.copyWith(isClockManipulated: true);
+        await _rememberDeviceTimestamp(current);
+        return;
+      }
+
+      final questsDate = await _readQuestsDate();
+      final savedCursor = await _readDayCursor(state.cycle.id);
+      int cursor;
+      if (savedCursor != null) {
+        cursor = savedCursor;
+      } else {
+        // No cursor yet (fresh install or upgrade): treat days before today as done,
+        // so we never retro-actively punish/reward old days.
+        cursor = state.cycle.currentDayIndex(current) - 1;
+        if (today.isAfter(_dateOnly(state.cycle.endDate))) {
+          cursor = state.cycle.totalDays;
+        }
+      }
+
+      // 1. Cycle rollover(s)
+      var rollovers = 0;
+      while (today.isAfter(_dateOnly(state.cycle.endDate)) &&
+          rollovers < _maxCycleRollovers) {
+        _processClosedDays(
+          fromDay: cursor + 1,
+          toDay: state.cycle.totalDays,
+          questsDate: questsDate,
+          summary: summary,
+        );
+        await _startNextCycle(now: current, summary: summary);
+        cursor = 0;
+        rollovers++;
+      }
+
+      // 2. Close finished days of the active cycle
+      final todayIndex = state.cycle.currentDayIndex(current);
+      if (todayIndex - 1 > cursor) {
+        _processClosedDays(
+          fromDay: cursor + 1,
+          toDay: todayIndex - 1,
+          questsDate: questsDate,
+          summary: summary,
+        );
+      }
+      cursor = todayIndex - 1;
+
+      // 3. Recompute budgets for today
+      final recompute = TransactionEventRecomputer.recompute(
+        cycle: state.cycle,
+        transactions: state.transactions,
+        currentDayIndex: todayIndex,
+      );
+      state = state.copyWith(
+        currentDayIndex: todayIndex,
+        dailyBudgets: recompute.budgets,
+        transactions: recompute.updatedTransactions,
+        bossCurrentHp: recompute.bossHp,
+        bossMaxHp: SalaryQuestRepository.defaultBossHpFor(state.cycle),
+        isClockManipulated: false,
+      );
+
+      // 4. Fresh quests for a new day
+      if (questsDate != _dateKey(today)) {
+        var freshQuests = GamificationEngine.getStarterQuests().toList();
+        final recovery = state.quests
+            .where((q) => q.type == QuestType.freshStartRecovery && !q.isClaimed);
+        if (recovery.isNotEmpty) {
+          freshQuests = [
+            recovery.first.copyWith(progressValue: 0.0, isCompleted: false),
+            ...freshQuests,
+          ];
+        }
+        state = state.copyWith(quests: freshQuests);
+        await _writeQuestsDate(today);
+      }
+      evaluateConsecutiveOverspends();
+      _evaluateAchievements();
+
+      await _writeDayCursor(state.cycle.id, cursor);
+      await _rememberDeviceTimestamp(current);
+      await _persistCurrentCycle();
+
+      if (summary.isNotEmpty) {
+        state = state.copyWith(dailySummary: summary.join('\n'));
+      }
+    } catch (_) {
+      // Maintenance must never crash the app; it will run again on next resume.
+    } finally {
+      _maintenanceRunning = false;
+    }
+  }
+
+  /// Applies once-per-day effects for closed days [fromDay]..[toDay] of the active cycle.
+  void _processClosedDays({
+    required int fromDay,
+    required int toDay,
+    required String? questsDate,
+    required List<String> summary,
+  }) {
+    if (toDay < fromDay) return;
+    final cycle = state.cycle;
+    final recompute = TransactionEventRecomputer.recompute(
+      cycle: cycle,
+      transactions: state.transactions,
+      currentDayIndex: (toDay + 1).clamp(1, cycle.totalDays),
+    );
+    final budgets = recompute.budgets;
+    final trackingStartDay = cycle.salaryReceivedDate != null
+        ? cycle.currentDayIndex(cycle.salaryReceivedDate!)
+        : 1;
+
+    var hero = state.hero;
+    var quests = state.quests;
+    final startHp = hero.currentHp;
+    var underBudgetDays = 0;
+    var overBudgetDays = 0;
+    var questXp = 0;
+    var questCoins = 0;
+
+    for (int day = fromDay; day <= toDay; day++) {
+      final idx = day - 1;
+      if (idx < 0 || idx >= budgets.length) continue;
+      if (day < trackingStartDay) continue; // before the user joined
+      final b = budgets[idx];
+
+      final hadExpense = state.transactions.any((t) =>
+          t.type == TransactionType.expense &&
+          !t.isFixedExpense &&
+          CycleDateCalculator.getDayIndexForTimestamp(
+                timestamp: t.timestamp,
+                cycleStartDate: cycle.startDate,
+                totalDays: cycle.totalDays,
+              ) ==
+              day);
+
+      final underBudget = b.actualSpent <= b.allocatedBudget;
+      if (underBudget) {
+        underBudgetDays++;
+      } else {
+        overBudgetDays++;
+      }
+
+      hero = GamificationEngine.evaluateDailyStreak(
+        hero: hero,
+        actualSpent: b.actualSpent,
+        allocatedBudget: b.allocatedBudget,
+      );
+      hero = GamificationEngine.evaluateDailyHealthImpact(
+        hero: hero,
+        spentRatio: b.spentRatio,
+      );
+
+      // Quests belong to the calendar day they were issued on
+      if (questsDate != null && questsDate == _dateKey(b.date)) {
+        quests = quests.map((q) {
+          if (q.isClaimed) return q;
+          var completed = q.isCompleted;
+          switch (q.type) {
+            case QuestType.spendUnderAmount:
+            case QuestType.freshStartRecovery:
+              completed = completed || underBudget;
+              break;
+            case QuestType.noSpendDay:
+              completed = completed || (!hadExpense && b.actualSpent.paise <= 0);
+              break;
+            case QuestType.logExpense:
+            case QuestType.reviewDay:
+              break;
+          }
+          if (!completed) return q;
+          // Auto-claim so rewards are never lost at midnight
+          final coins = GamificationEngine.calculateQuestCoinReward(hero, q.rewardCoins);
+          hero = GamificationEngine.awardXp(hero, q.rewardXp);
+          hero = hero.copyWith(
+            coins: hero.coins + coins,
+            currentHp: (hero.currentHp + q.rewardHp).clamp(0, hero.maxHp),
+          );
+          questXp += q.rewardXp;
+          questCoins += coins;
+          return q.copyWith(progressValue: 1.0, isCompleted: true, isClaimed: true);
+        }).toList();
+      }
+    }
+
+    final daysCount = underBudgetDays + overBudgetDays;
+    if (daysCount > 0) {
+      final hpDelta = hero.currentHp - startHp;
+      final dayWord = daysCount == 1 ? 'Yesterday' : 'Last $daysCount days';
+      final parts = <String>[
+        overBudgetDays == 0
+            ? '$dayWord: under budget ✅'
+            : '$dayWord: $overBudgetDays over budget ⚠️',
+        '🔥 Streak ${hero.streakDays}',
+        if (hpDelta != 0) '❤️ HP ${hpDelta > 0 ? '+' : ''}$hpDelta',
+        if (questXp > 0) '🎁 Quests +$questXp XP, +$questCoins coins',
+      ];
+      summary.add(parts.join(' • '));
+    }
+
+    state = state.copyWith(hero: hero, quests: quests);
+  }
+
+  /// Closes the finished cycle and opens the next one (same salary setup).
+  Future<void> _startNextCycle({
+    required DateTime now,
+    required List<String> summary,
+  }) async {
+    final old = state.cycle;
+    final repo = _repository;
+
+    // Final numbers for the finished cycle
+    final finalRecompute = TransactionEventRecomputer.recompute(
+      cycle: old,
+      transactions: state.transactions,
+      currentDayIndex: old.totalDays,
+    );
+    final closedBudgets = finalRecompute.budgets
+        .map((b) => b.copyWith(isClosed: true))
+        .toList();
+    final leftover = old.discretionaryPool - state.totalDiscretionarySpent;
+
+    // Boss result for the finished cycle
+    var hero = state.hero;
+    if (finalRecompute.bossHp <= 0) {
+      hero = GamificationEngine.awardXp(hero, 500);
+      hero = hero.copyWith(coins: hero.coins + 200);
+      summary.add('🏆 Boss defeated last cycle! +500 XP, +200 coins');
+    }
+    // A fresh streak shield every cycle
+    hero = hero.copyWith(streakShieldAvailable: true);
+
+    if (repo != null) {
+      await repo.saveCycleAndBudgets(
+        cycle: old,
+        dailyBudgets: closedBudgets,
+        hero: hero,
+        quests: state.quests,
+        bossCurrentHp: finalRecompute.bossHp,
+        bossMaxHp: SalaryQuestRepository.defaultBossHpFor(old),
+      );
+      await repo.archiveCycle(old.id);
+    }
+
+    // Next cycle starts the day after the old one ended
+    // Calendar arithmetic (not Duration) so daylight-saving changes can't shift the date
+    final nextStart =
+        DateTime(old.endDate.year, old.endDate.month, old.endDate.day + 1);
+    final dates = CycleDateCalculator.computeCycleDates(
+      year: nextStart.year,
+      month: nextStart.month,
+      paydayDay: old.paydayDay,
+    );
+    final newCycle = BudgetCycle(
+      id: 'cycle_${nextStart.year}_${nextStart.month}_${old.paydayDay}_${now.millisecondsSinceEpoch}',
+      startDate: nextStart,
+      endDate: dates.endDate,
+      totalDays: dates.endDate.difference(nextStart).inDays + 1,
+      paydayDay: old.paydayDay,
+      inHandSalary: old.inHandSalary,
+      fixedExpensesTotal: old.fixedExpensesTotal,
+      savingsTargetAmount: old.savingsTargetAmount,
+      rolloverStrategy: old.rolloverStrategy,
+    );
+    final newBudgets =
+        BudgetCalculator.generateInitialCycleBudgets(cycle: newCycle);
+    final bossHp = SalaryQuestRepository.defaultBossHpFor(newCycle);
+
+    state = state.copyWith(
+      cycle: newCycle,
+      dailyBudgets: newBudgets,
+      currentDayIndex: newCycle.currentDayIndex(now),
+      transactions: const [],
+      hero: hero,
+      bossCurrentHp: bossHp,
+      bossMaxHp: bossHp,
+    );
+
+    summary.add(
+        '📅 New salary cycle started: ${CurrencyFormatter.formatMoney(newCycle.baseDailyBudget)}/day');
+
+    // Month-end auto-flow: leftover discretionary money goes to the primary goal
+    if (state.isAutoFlowSavingsEnabled &&
+        state.savingsGoals.isNotEmpty &&
+        leftover.isPositive) {
+      final targetId = state.autoFlowGoalId ??
+          state.savingsGoals
+              .firstWhere((g) => g.isPrimary,
+                  orElse: () => state.savingsGoals.first)
+              .id;
+      if (state.savingsGoals.any((g) => g.id == targetId)) {
+        await depositToGoal(goalId: targetId, amount: leftover);
+        summary.add(
+            '💰 ${CurrencyFormatter.formatMoney(leftover)} left over last cycle moved to your savings goal');
+      }
+    }
+
+    await _writeDayCursor(newCycle.id, 0);
+    await _persistCurrentCycle();
+  }
+
+  /// Saves the active cycle, budgets, hero, quests and boss HP in one transaction.
+  Future<void> _persistCurrentCycle() async {
+    final repo = _repository;
+    if (repo == null) return;
+    await repo.saveCycleAndBudgets(
+      cycle: state.cycle,
+      dailyBudgets: state.dailyBudgets,
+      hero: state.hero,
+      quests: state.quests,
+      bossCurrentHp: state.bossCurrentHp,
+      bossMaxHp: state.bossMaxHp,
+    );
+  }
+
+  static SalaryQuestState _buildInitialState({bool isLoading = false}) {
     final now = DateTime.now();
 
     final cycle = BudgetCycle.createValidated(
@@ -273,6 +735,7 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       quests: GamificationEngine.getStarterQuests(),
       bossCurrentHp: targetRupees,
       bossMaxHp: targetRupees,
+      isLoading: isLoading,
     );
   }
 
@@ -321,16 +784,20 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     final effectiveFixedExpense =
         isFixedExpense ?? FixedExpenseMatcher.isLikelyFixedExpense(title);
 
-    // 3. Clock integrity check
+    // 3. Clock integrity check.
+    // Compares the *device clock* with the last time we saw it. Back-dated entries
+    // (bank SMS that arrived while the app was closed, manual past entries) are
+    // legitimate and must not be flagged as tampering.
+    final deviceNow = DateTime.now();
     final isTampered = ClockIntegrityService.isClockManipulated(
-      currentTimestamp: txTimestamp,
+      currentTimestamp: deviceNow,
       lastKnownTimestamp: _lastKnownDeviceTimestamp,
     );
-
-    if (!isTampered &&
-        (customTimestamp == null ||
-            txTimestamp.isAfter(_lastKnownDeviceTimestamp ?? DateTime(2000)))) {
-      _lastKnownDeviceTimestamp = txTimestamp;
+    // Remember the latest clock reading. After a backwards jump this entry earns
+    // no XP, but later entries are judged against the corrected clock.
+    final last = _lastKnownDeviceTimestamp;
+    if (isTampered || last == null || deviceNow.isAfter(last)) {
+      await _rememberDeviceTimestamp(deviceNow);
     }
 
     // 4. Calculate earned XP with anti-farming limit (cap at 3 transactions/day, max 45 XP/day)
@@ -387,21 +854,19 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       currentDayIndex: state.currentDayIndex,
     );
 
-    // 6. Gamification updates
-    final todaySpentRatio =
-        recompute.budgets[state.currentDayIndex - 1].spentRatio;
-    var updatedHero = GamificationEngine.evaluateDailyHealthImpact(
-      hero: state.hero,
-      spentRatio: todaySpentRatio,
-    );
-
+    // 6. Gamification updates.
+    // Hero HP and streak are evaluated once per day when the day closes
+    // (see runDailyMaintenance) — not on every transaction.
+    var updatedHero = state.hero;
     if (earnedXp > 0) {
       updatedHero = GamificationEngine.awardXp(updatedHero, earnedXp);
     }
 
+    final isTodayTx = targetDayIndex == state.currentDayIndex;
     final updatedQuests = state.quests.map((quest) {
       if (quest.type == QuestType.logExpense &&
           !quest.isCompleted &&
+          isTodayTx &&
           !effectiveFixedExpense &&
           type == TransactionType.expense) {
         return quest.copyWith(
@@ -553,8 +1018,22 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
 
   /// Edits an existing transaction and recalculates all downstream budgets.
   Future<void> editTransaction(Transaction updatedTx) async {
+    final original =
+        state.transactions.where((t) => t.id == updatedTx.id).toList();
+    var effectiveTx = updatedTx;
+    var updatedHero = state.hero;
+    // Logging XP is only for discretionary expenses: take it back if the edit
+    // turned this entry into something else (fixed bill, income, transfer...).
+    final stillEarnsXp =
+        updatedTx.type == TransactionType.expense && !updatedTx.isFixedExpense;
+    if (original.isNotEmpty && original.first.earnedXp > 0 && !stillEarnsXp) {
+      updatedHero =
+          GamificationEngine.revertXp(updatedHero, original.first.earnedXp);
+      effectiveTx = updatedTx.copyWith(earnedXp: 0);
+    }
+
     final updatedTxList = state.transactions.map((t) {
-      return t.id == updatedTx.id ? updatedTx : t;
+      return t.id == effectiveTx.id ? effectiveTx : t;
     }).toList();
 
     final recompute = TransactionEventRecomputer.recompute(
@@ -567,14 +1046,15 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       transactions: recompute.updatedTransactions,
       dailyBudgets: recompute.budgets,
       bossCurrentHp: recompute.bossHp,
+      hero: updatedHero,
     );
 
     final repo = _repository;
     if (repo != null) {
       await repo.recordTransaction(
-        transaction: updatedTx,
+        transaction: effectiveTx,
         rebalancedBudgets: recompute.budgets,
-        hero: state.hero,
+        hero: updatedHero,
         quests: state.quests,
         newBossHp: recompute.bossHp,
       );
@@ -605,11 +1085,8 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
   }) async {
     if (amount.paise <= 0) return;
 
-    final result = CycleManagerService.injectExtraIncome(
-      currentCycle: state.cycle,
-      currentBudgets: state.dailyBudgets,
-      currentDayIndex: state.currentDayIndex,
-      extraIncome: amount,
+    final updatedCycle = state.cycle.copyWith(
+      inHandSalary: state.cycle.inHandSalary + amount,
     );
 
     final incomeTx = Transaction(
@@ -624,25 +1101,26 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     );
 
     final updatedTxList = [incomeTx, ...state.transactions];
-    final newBossHp = (state.bossCurrentHp + amount.inWholeRupees)
-        .clamp(0, result.updatedCycle.discretionaryPool.inWholeRupees);
+
+    // Same event-sourced recompute used everywhere else, so budgets and Boss HP stay consistent
+    final recompute = TransactionEventRecomputer.recompute(
+      cycle: updatedCycle,
+      transactions: updatedTxList,
+      currentDayIndex: state.currentDayIndex,
+    );
 
     state = state.copyWith(
-      cycle: result.updatedCycle,
-      dailyBudgets: result.updatedBudgets,
-      transactions: updatedTxList,
-      bossCurrentHp: newBossHp,
-      bossMaxHp: result.updatedCycle.discretionaryPool.inWholeRupees,
+      cycle: updatedCycle,
+      dailyBudgets: recompute.budgets,
+      transactions: recompute.updatedTransactions,
+      bossCurrentHp: recompute.bossHp,
+      bossMaxHp: SalaryQuestRepository.defaultBossHpFor(updatedCycle),
     );
 
     final repo = _repository;
     if (repo != null) {
-      await repo.saveCycleAndBudgets(
-        cycle: result.updatedCycle,
-        dailyBudgets: result.updatedBudgets,
-        hero: state.hero,
-        quests: state.quests,
-      );
+      await _persistCurrentCycle();
+      await repo.upsertTransactions([incomeTx]);
     }
   }
 
@@ -666,58 +1144,67 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       throw BudgetValidationException(validationError);
     }
 
-    if (paydayChanged) {
+    final effectiveReceived = salaryReceivedDate ?? state.cycle.salaryReceivedDate;
+    final receivedChanged = salaryReceivedDate != null &&
+        salaryReceivedDate != state.cycle.salaryReceivedDate;
+
+    if (paydayChanged || receivedChanged) {
+      // Cycle dates change: close the old cycle record and open a new one,
+      // carrying over every transaction that falls inside the new dates.
       final activeDates = CycleDateCalculator.computeActiveCycleDates(
         now: now,
         paydayDay: effectivePayday,
-        salaryReceivedDate: salaryReceivedDate ?? state.cycle.salaryReceivedDate,
+        salaryReceivedDate: paydayChanged ? salaryReceivedDate : effectiveReceived,
       );
 
-      final newCycle = BudgetCycle.createValidated(
-        id: 'cycle_${activeDates.cycleYear}_${activeDates.cycleMonth}_$effectivePayday',
-        year: activeDates.cycleYear,
-        month: activeDates.cycleMonth,
+      final oldCycle = state.cycle;
+      final newCycle = BudgetCycle(
+        id: 'cycle_${activeDates.cycleYear}_${activeDates.cycleMonth}_${effectivePayday}_${now.millisecondsSinceEpoch}',
+        startDate: activeDates.startDate,
+        endDate: activeDates.endDate,
+        totalDays: activeDates.totalDays,
         paydayDay: effectivePayday,
-        salaryReceivedDate: salaryReceivedDate ?? state.cycle.salaryReceivedDate,
+        salaryReceivedDate: paydayChanged ? salaryReceivedDate : effectiveReceived,
         inHandSalary: inHandSalary,
         fixedExpensesTotal: fixedExpenses,
         savingsTargetAmount: savingsTarget,
+        rolloverStrategy: oldCycle.rolloverStrategy,
       );
 
-      final newBudgets =
-          BudgetCalculator.generateInitialCycleBudgets(cycle: newCycle);
+      final newStart = _dateOnly(newCycle.startDate);
+      final carried = state.transactions
+          .where((t) => !_dateOnly(t.timestamp).isBefore(newStart))
+          .map((t) => t.copyWith(cycleId: newCycle.id))
+          .toList();
       final newCurrentDay = newCycle.currentDayIndex(now);
 
-      final poolInt = newCycle.discretionaryPool.inWholeRupees;
-      final targetInt = newCycle.savingsTargetAmount.inWholeRupees > 0
-          ? newCycle.savingsTargetAmount.inWholeRupees
-          : poolInt;
+      final recompute = TransactionEventRecomputer.recompute(
+        cycle: newCycle,
+        transactions: carried,
+        currentDayIndex: newCurrentDay,
+      );
 
       state = state.copyWith(
         cycle: newCycle,
-        dailyBudgets: newBudgets,
+        dailyBudgets: recompute.budgets,
+        transactions: recompute.updatedTransactions,
         currentDayIndex: newCurrentDay,
-        bossMaxHp: targetInt,
-        bossCurrentHp: targetInt,
+        bossMaxHp: SalaryQuestRepository.defaultBossHpFor(newCycle),
+        bossCurrentHp: recompute.bossHp,
       );
 
       final repo = _repository;
       if (repo != null) {
-        await repo.saveCycleAndBudgets(
-          cycle: newCycle,
-          dailyBudgets: newBudgets,
-          hero: state.hero,
-          quests: state.quests,
-        );
+        await repo.archiveCycle(oldCycle.id);
+        await _persistCurrentCycle();
+        await repo.upsertTransactions(recompute.updatedTransactions);
       }
+      await _writeDayCursor(newCycle.id, newCurrentDay - 1);
       return;
     }
 
     final result = CycleManagerService.recalculateMidCycle(
-      currentCycle: state.cycle.copyWith(
-        paydayDay: effectivePayday,
-        salaryReceivedDate: salaryReceivedDate ?? state.cycle.salaryReceivedDate,
-      ),
+      currentCycle: state.cycle,
       currentBudgets: state.dailyBudgets,
       currentDayIndex: state.currentDayIndex,
       newSalary: inHandSalary,
@@ -726,32 +1213,25 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     );
 
     final currentDay = result.updatedCycle.currentDayIndex(now);
-    final poolInt = result.updatedCycle.discretionaryPool.inWholeRupees;
-    final targetInt = result.updatedCycle.savingsTargetAmount.inWholeRupees > 0
-        ? result.updatedCycle.savingsTargetAmount.inWholeRupees
-        : poolInt;
+    final recompute = TransactionEventRecomputer.recompute(
+      cycle: result.updatedCycle,
+      transactions: state.transactions,
+      currentDayIndex: currentDay,
+    );
 
     state = state.copyWith(
       cycle: result.updatedCycle,
       currentDayIndex: currentDay,
       dailyBudgets: result.updatedBudgets,
-      bossMaxHp: targetInt,
-      bossCurrentHp: targetInt.clamp(0, state.bossCurrentHp),
+      bossMaxHp: SalaryQuestRepository.defaultBossHpFor(result.updatedCycle),
+      bossCurrentHp: recompute.bossHp,
     );
 
-    final repo = _repository;
-    if (repo != null) {
-      await repo.saveCycleAndBudgets(
-        cycle: result.updatedCycle,
-        dailyBudgets: result.updatedBudgets,
-        hero: state.hero,
-        quests: state.quests,
-      );
-    }
+    await _persistCurrentCycle();
   }
 
-  void markSalaryReceivedDate(DateTime date) {
-    updateSalarySetup(
+  Future<void> markSalaryReceivedDate(DateTime date) async {
+    await updateSalarySetup(
       inHandSalary: state.cycle.inHandSalary,
       fixedExpenses: state.cycle.fixedExpensesTotal,
       savingsTarget: state.cycle.savingsTargetAmount,
@@ -798,15 +1278,7 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
         hero: updatedHero,
       );
 
-      final repo = _repository;
-      if (repo != null) {
-        await repo.saveCycleAndBudgets(
-          cycle: state.cycle,
-          dailyBudgets: state.dailyBudgets,
-          hero: updatedHero,
-          quests: updatedQuests,
-        );
-      }
+      await _persistCurrentCycle();
     }
   }
 
@@ -840,6 +1312,13 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       notificationsEnabled: prefs.enabled,
       maxNotificationsPerDay: prefs.maxPerDay,
     );
+    final repo = _repository;
+    if (repo != null) {
+      try {
+        await repo.saveNotificationPreferences(prefs);
+      } catch (_) {}
+      await notificationManager.syncDailyReminders();
+    }
   }
 
   /// Evaluates policy and dispatches an alert via NotificationManager.
@@ -930,34 +1409,10 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     state = state.copyWith(isAuthenticated: authenticated);
   }
 
-  /// Catches up missed days and midnight rollover when returning from background.
+  /// Catches up missed days, midnight rollover and payday rollover when
+  /// returning from background.
   Future<void> catchUpOnResume() async {
-    final now = DateTime.now();
-    final currentDay = state.cycle.currentDayIndex(now);
-    if (currentDay > state.currentDayIndex) {
-      final caughtUpBudgets = CycleManagerService.catchUpMissedDays(
-        cycle: state.cycle,
-        budgets: state.dailyBudgets,
-        lastKnownDayIndex: state.currentDayIndex,
-        currentDayIndex: currentDay,
-      );
-
-      state = state.copyWith(
-        currentDayIndex: currentDay,
-        dailyBudgets: caughtUpBudgets,
-      );
-
-      final repo = _repository;
-      if (repo != null) {
-        await repo.saveCycleAndBudgets(
-          cycle: state.cycle,
-          dailyBudgets: caughtUpBudgets,
-          hero: state.hero,
-          quests: state.quests,
-        );
-      }
-      evaluateConsecutiveOverspends();
-    }
+    await runDailyMaintenance();
   }
 
   /// Evaluates whether the user has had 10 consecutive overspend days.
@@ -1102,17 +1557,19 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
   }
 
   /// Advances to next cycle: archives the current cycle, resets Boss HP to new savings target.
+  /// (Normally this happens automatically on payday via [runDailyMaintenance].)
   Future<void> advanceToNextCycle({
     required int nextMonth,
     required int nextYear,
   }) async {
     final repo = _repository;
     if (repo != null) {
+      await _persistCurrentCycle();
       await repo.archiveCycle(state.cycle.id);
     }
 
     final newCycle = BudgetCycle.createValidated(
-      id: 'cycle_${nextYear}_$nextMonth',
+      id: 'cycle_${nextYear}_${nextMonth}_${state.cycle.paydayDay}_${DateTime.now().millisecondsSinceEpoch}',
       year: nextYear,
       month: nextMonth,
       paydayDay: state.cycle.paydayDay,
@@ -1123,7 +1580,7 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
 
     final newBudgets =
         BudgetCalculator.generateInitialCycleBudgets(cycle: newCycle);
-    final targetRupees = newCycle.savingsTargetAmount.inWholeRupees;
+    final targetRupees = SalaryQuestRepository.defaultBossHpFor(newCycle);
 
     state = state.copyWith(
       cycle: newCycle,
@@ -1132,16 +1589,11 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       transactions: const [],
       bossCurrentHp: targetRupees,
       bossMaxHp: targetRupees,
+      hero: state.hero.copyWith(streakShieldAvailable: true),
     );
 
-    if (repo != null) {
-      await repo.saveCycleAndBudgets(
-        cycle: newCycle,
-        dailyBudgets: newBudgets,
-        hero: state.hero,
-        quests: state.quests,
-      );
-    }
+    await _persistCurrentCycle();
+    await _writeDayCursor(newCycle.id, 0);
   }
 
   /// Creates a new savings goal and saves it to persistence.
@@ -1323,6 +1775,7 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     state = state.copyWith(
       savingsGoals: updatedList,
       autoFlowGoalId: newAutoFlowId,
+      clearAutoFlowGoalId: newAutoFlowId == null,
       cycle: updatedCycle,
     );
 
@@ -1333,6 +1786,9 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
         enabled: state.isAutoFlowSavingsEnabled,
         goalId: newAutoFlowId,
       );
+      if (returnedPaise > 0) {
+        await _persistCurrentCycle();
+      }
     }
   }
 
@@ -1413,6 +1869,12 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
     if (securityService != null) {
       await securityService.wipeSecurityKeys();
     }
+    await notificationManager.cancelAll();
+    notificationManager.clearHistory();
+    _memoryCursor.clear();
+    _memoryQuestsDate = null;
+    _lastKnownDeviceTimestamp = null;
+    _isOnboardingInProgressOrDone = false;
     state = _buildInitialState().copyWith(isOnboarded: false);
   }
 
@@ -1433,7 +1895,7 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       paydayDay: paydayDay,
     );
     final cycle = BudgetCycle(
-      id: 'cycle_${activeDates.cycleYear}_${activeDates.cycleMonth}',
+      id: 'cycle_${activeDates.cycleYear}_${activeDates.cycleMonth}_${paydayDay}_${now.millisecondsSinceEpoch}',
       startDate: activeDates.startDate,
       endDate: activeDates.endDate,
       totalDays: activeDates.totalDays,
@@ -1496,68 +1958,100 @@ class SalaryQuestNotifier extends StateNotifier<SalaryQuestState> {
       bossMaxHp: targetRupees,
       isSeriousMode: isSeriousMode,
       isOnboarded: true,
+      isLoading: false,
     );
 
     final repo = _repository;
     if (repo != null) {
-      await repo.saveCycleAndBudgets(
-        cycle: cycle,
-        dailyBudgets: initialBudgets,
-        hero: hero,
-        quests: quests,
-      );
+      await _persistCurrentCycle();
+      await repo.saveSeriousMode(isSeriousMode);
+      await repo.savePreference(
+          SalaryQuestRepository.kvLanguage, state.languageCode);
+    }
+    // Days before joining are never evaluated; today's quests start now.
+    await _writeDayCursor(cycle.id, currentDay - 1);
+    await _writeQuestsDate(now);
+    await _rememberDeviceTimestamp(now);
+    if (repo != null) {
+      await _initNotifications();
     }
   }
 
   /// Sets the application UI locale language code ('en' or 'hi').
   void setLocale(String languageCode) {
     state = state.copyWith(languageCode: languageCode);
+    _repository?.savePreference(SalaryQuestRepository.kvLanguage, languageCode);
   }
 
   /// Exports an AES-encrypted backup ciphertext of the entire application state.
-  Future<String> exportBackup({LocalSecurityService? securityService}) async {
+  Future<String> exportBackup({
+    LocalSecurityService? securityService,
+    String? password,
+  }) async {
     final sec = securityService ?? LocalSecurityService();
     return await BackupRestoreService.exportEncryptedBackup(
       state: state,
       securityService: sec,
+      password: password,
     );
   }
 
   /// Restores state from an AES-encrypted backup ciphertext, merging incoming transactions
   /// with existing records using DataConflictResolver (Latest-Edit-Wins with zero duplicates).
+  /// Password-protected backups (made with a password) can be restored on any phone.
   Future<BackupRestoreResult> restoreBackup(
     String encryptedData, {
     LocalSecurityService? securityService,
+    String? password,
   }) async {
     final sec = securityService ?? LocalSecurityService();
+    final previousCycleId = state.cycle.id;
     final result = await BackupRestoreService.restoreEncryptedBackup(
       encryptedData: encryptedData,
       currentState: state,
       securityService: sec,
+      password: password,
     );
 
-    state = result.restoredState;
+    final restoredCycleId = result.restoredState.cycle.id;
+    final normalizedTransactions = result.restoredState.transactions
+        .map((t) => t.cycleId == restoredCycleId
+            ? t
+            : t.copyWith(cycleId: restoredCycleId))
+        .toList();
+
+    state = result.restoredState.copyWith(
+      transactions: normalizedTransactions,
+      isLoading: false,
+      clearLoadError: true,
+    );
+    _isOnboardingInProgressOrDone = true;
 
     final repo = _repository;
     if (repo != null) {
-      await repo.saveCycleAndBudgets(
-        cycle: state.cycle,
-        dailyBudgets: state.dailyBudgets,
-        hero: state.hero,
-        quests: state.quests,
-      );
-      // Persist transactions
-      for (final tx in state.transactions) {
-        await repo.recordTransaction(
-          transaction: tx,
-          rebalancedBudgets: state.dailyBudgets,
-          hero: state.hero,
-          quests: state.quests,
-          newBossHp: state.bossCurrentHp,
-        );
+      if (previousCycleId != restoredCycleId) {
+        await repo.archiveCycle(previousCycleId);
       }
+      await _persistCurrentCycle();
+      await repo.upsertTransactions(normalizedTransactions);
+      for (final goal in state.savingsGoals) {
+        await repo.saveSavingsGoal(goal);
+      }
+      for (final achievement in state.achievements) {
+        await repo.unlockAchievement(achievement);
+      }
+      await repo.saveSeriousMode(state.isSeriousMode);
+      await repo.saveReducedMotion(state.isReduceMotion);
+      await repo.saveAutoFlowSettings(
+        enabled: state.isAutoFlowSavingsEnabled,
+        goalId: state.autoFlowGoalId,
+      );
+      await repo.savePreference(
+          SalaryQuestRepository.kvLanguage, state.languageCode);
     }
 
+    // Note: the caller should run [catchUpOnResume] afterwards to bring an older
+    // backup up to today (close finished days / start a new cycle if needed).
     return result;
   }
 }

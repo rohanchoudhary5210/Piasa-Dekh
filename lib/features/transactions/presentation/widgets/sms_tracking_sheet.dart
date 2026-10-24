@@ -92,7 +92,7 @@ class _SmsTrackingSheetState extends ConsumerState<SmsTrackingSheet> {
     int importedCount = 0;
 
     for (final parsed in results) {
-      if (parsed.amount != null && parsed.isFinancial && !parsed.isIgnored) {
+      if (parsed.affectsBudget) {
         try {
           await ref.read(salaryQuestProvider.notifier).addTransaction(
                 amount: parsed.amount!,
@@ -140,7 +140,7 @@ class _SmsTrackingSheetState extends ConsumerState<SmsTrackingSheet> {
     int importedCount = 0;
 
     for (final parsed in results) {
-      if (parsed.amount != null && parsed.isFinancial && !parsed.isIgnored) {
+      if (parsed.affectsBudget) {
         try {
           await ref.read(salaryQuestProvider.notifier).addTransaction(
                 amount: parsed.amount!,
@@ -313,34 +313,79 @@ class _SmsTrackingSheetState extends ConsumerState<SmsTrackingSheet> {
               ),
               const SizedBox(height: 10),
             ] else ...[
+              // Option 1: Sync Entire Salary Cycle (From cycle start date to today)
+              Builder(
+                builder: (context) {
+                  final cycle = ref.watch(salaryQuestProvider).cycle;
+                  final startLabel = DateFormat('d MMM').format(cycle.startDate).toUpperCase();
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSyncing ? null : _syncCurrentCycle,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.manaPurple,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: _isSyncing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.date_range_rounded,
+                              size: 18,
+                            ),
+                      label: Text(
+                        _isSyncing
+                            ? 'SCANNING CYCLE SMS...'
+                            : 'IMPORT SALARY CYCLE ($startLabel - TODAY)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // Option 2: Sync Today's Spends Only
               SizedBox(
                 width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _isSyncing ? null : _syncInbox,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(100),
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: _isSyncing ? null : _syncTodayOnly,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: BorderSide(
+                      color: AppColors.surfaceBorder.withValues(alpha: 0.8),
                     ),
-                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
-                  icon: _isSyncing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.black),
-                        )
-                      : const Icon(Icons.sync_rounded,
-                          size: 18, color: Colors.black),
-                  label: Text(
-                    _isSyncing ? 'SCANNING INBOX...' : 'SYNC RECENT BANK SMS (7 DAYS)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.8,
+                  icon: const Icon(
+                    Icons.today_rounded,
+                    size: 17,
+                    color: AppColors.xpBlue,
+                  ),
+                  label: const Text(
+                    'SYNC TODAY ONLY (FROM 12:00 AM)',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
@@ -491,7 +536,7 @@ class _SmsTrackingSheetState extends ConsumerState<SmsTrackingSheet> {
                         ),
                       ),
                     ],
-                    if (_testResult!.isFinancial && !_testResult!.isIgnored && _testResult!.amount != null) ...[
+                    if (_testResult!.affectsBudget) ...[
                       const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,

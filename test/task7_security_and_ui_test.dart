@@ -117,14 +117,16 @@ void main() {
       expect(unlockedCalled, isTrue);
     });
 
-    testWidgets('6. Biometric Lock Screen: PIN Fallback opens keypad and unlocks vault with backup PIN (1234)', (tester) async {
+    testWidgets('6. Biometric Lock Screen: PIN Fallback opens keypad and unlocks vault with the user-set backup PIN', (tester) async {
       bool unlockedCalled = false;
+      final securityService = LocalSecurityService(memoryFallback: {});
+      await securityService.setBackupPin('4321');
 
       await tester.pumpWidget(
         MaterialApp(
           home: BiometricLockScreen(
             authService: BiometricAuthService(mockAuthResult: false), // Biometrics fail
-            securityService: LocalSecurityService(memoryFallback: {}),
+            securityService: securityService,
             autoTrigger: false,
             onUnlocked: () {
               unlockedCalled = true;
@@ -145,11 +147,17 @@ void main() {
       await tester.tap(find.byKey(const Key('btn_submit_pin')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Incorrect PIN. Try default (1234)'), findsOneWidget);
+      expect(find.text('Incorrect PIN. Please try again.'), findsOneWidget);
       expect(unlockedCalled, isFalse);
 
-      // Enter correct backup PIN (1234)
+      // The old hard-coded default PIN must NOT unlock the vault
       await tester.enterText(find.byKey(const Key('input_backup_pin')), '1234');
+      await tester.tap(find.byKey(const Key('btn_submit_pin')));
+      await tester.pumpAndSettle();
+      expect(unlockedCalled, isFalse);
+
+      // Enter correct user-set backup PIN (4321)
+      await tester.enterText(find.byKey(const Key('input_backup_pin')), '4321');
       await tester.tap(find.byKey(const Key('btn_submit_pin')));
       await tester.pumpAndSettle();
 

@@ -8,7 +8,12 @@ import 'package:salary_quest/features/home/presentation/providers/salary_quest_p
 import 'package:salary_quest/features/savings_goals/domain/models/savings_goal.dart';
 
 class SavingsGoalsScreen extends ConsumerStatefulWidget {
-  const SavingsGoalsScreen({super.key});
+  final bool isEmbeddedTab;
+
+  const SavingsGoalsScreen({
+    super.key,
+    this.isEmbeddedTab = false,
+  });
 
   @override
   ConsumerState<SavingsGoalsScreen> createState() => _SavingsGoalsScreenState();
@@ -386,6 +391,7 @@ class _SavingsGoalsScreenState extends ConsumerState<SavingsGoalsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.isEmbeddedTab,
         backgroundColor: AppColors.background,
         elevation: 0,
         title: const Text(
@@ -512,8 +518,8 @@ class _SavingsGoalsScreenState extends ConsumerState<SavingsGoalsScreen> {
                   const SizedBox(height: 6),
                   Text(
                     goals.isEmpty
-                        ? 'Create a savings goal below to enable auto-flowing leftover daily budget.'
-                        : 'When enabled, unspent daily budget at the end of the day automatically flows into your primary goal.',
+                        ? 'Create a savings goal below to enable auto-flowing leftover money.'
+                        : 'When enabled, whatever is left of your spending money when the salary cycle ends is moved into your primary goal automatically.',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,

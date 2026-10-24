@@ -16,10 +16,27 @@ class SentNotificationRecord {
   });
 }
 
+class ScheduledNotificationRecord {
+  final int id;
+  final int hour;
+  final int minute;
+  final String title;
+  final String body;
+
+  const ScheduledNotificationRecord({
+    required this.id,
+    required this.hour,
+    required this.minute,
+    required this.title,
+    required this.body,
+  });
+}
+
 class FakeNotificationService implements INotificationService {
   bool permissionGranted;
   bool isInitialized = false;
   final List<SentNotificationRecord> sentNotifications = [];
+  final Map<int, ScheduledNotificationRecord> scheduledNotifications = {};
 
   FakeNotificationService({this.permissionGranted = true});
 
@@ -59,12 +76,31 @@ class FakeNotificationService implements INotificationService {
   }
 
   @override
+  Future<void> scheduleDailyNotification({
+    required int id,
+    required int hour,
+    required int minute,
+    required String title,
+    required String body,
+  }) async {
+    scheduledNotifications[id] = ScheduledNotificationRecord(
+      id: id,
+      hour: hour,
+      minute: minute,
+      title: title,
+      body: body,
+    );
+  }
+
+  @override
   Future<void> cancel(int id) async {
     sentNotifications.removeWhere((n) => n.id == id);
+    scheduledNotifications.remove(id);
   }
 
   @override
   Future<void> cancelAll() async {
     sentNotifications.clear();
+    scheduledNotifications.clear();
   }
 }

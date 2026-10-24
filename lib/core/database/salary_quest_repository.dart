@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:salary_quest/core/models/money.dart';
@@ -9,6 +11,7 @@ import 'package:salary_quest/features/gamification/domain/models/hero_character.
 import 'package:salary_quest/features/gamification/domain/models/quest.dart';
 import 'package:salary_quest/features/gamification/domain/services/gamification_engine.dart';
 import 'package:salary_quest/features/home/presentation/providers/salary_quest_provider.dart';
+import 'package:salary_quest/features/notifications/domain/models/notification_preferences.dart';
 import 'package:salary_quest/features/savings_goals/domain/models/savings_goal.dart';
 import 'package:salary_quest/features/transactions/domain/models/transaction.dart';
 import 'app_database.dart';
@@ -18,6 +21,116 @@ class SalaryQuestRepository {
   final AppDatabase db;
 
   SalaryQuestRepository(this.db);
+
+  // Key-value store keys
+  static const String kvHeroCosmetics = 'hero_cosmetics';
+  static const String kvLanguage = 'language_code';
+  static const String kvNotificationPrefs = 'notification_prefs';
+  static const String kvLastKnownTimestamp = 'last_known_device_ts';
+  static const String kvDayCursor = 'day_cursor';
+  static const String kvQuestsDate = 'quests_date';
+
+  /// Boss HP used for a cycle when the caller does not provide one:
+  /// the monthly savings target (or the discretionary pool if no target is set).
+  static int defaultBossHpFor(BudgetCycle cycle) {
+    final target = cycle.savingsTargetAmount.inWholeRupees;
+    return target > 0 ? target : cycle.discretionaryPool.inWholeRupees;
+  }
+
+  /// Stores purchased / equipped skins and themes, which have no SQL columns.
+  Future<void> _saveHeroCosmetics(HeroCharacter hero) async {
+    await db.writeKv(
+      kvHeroCosmetics,
+      jsonEncode({
+        'skin': hero.skin,
+        'unlockedSkins': hero.unlockedSkins,
+        'themeId': hero.themeId,
+        'unlockedThemes': hero.unlockedThemes,
+      }),
+    );
+  }
+
+  Future<HeroCharacter> _applyHeroCosmetics(HeroCharacter hero) async {
+    final raw = await db.readKv(kvHeroCosmetics);
+    if (raw == null) return hero;
+    try {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      return hero.copyWith(
+        skin: json['skin'] as String? ?? hero.skin,
+        unlockedSkins: (json['unlockedSkins'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            hero.unlockedSkins,
+        themeId: json['themeId'] as String? ?? hero.themeId,
+        unlockedThemes: (json['unlockedThemes'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            hero.unlockedThemes,
+      );
+    } catch (_) {
+      return hero;
+    }
+  }
+
+  /// Saves a single string preference (language, cursors, JSON blobs).
+  Future<void> savePreference(String key, String value) async {
+    try {
+      await db.writeKv(key, value);
+    } catch (e, st) {
+      _handleDbError(e, st);
+    }
+  }
+
+  /// Reads a single string preference, or null if never saved.
+  Future<String?> readPreference(String key) async {
+    try {
+      return await db.readKv(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Persists notification preferences.
+  Future<void> saveNotificationPreferences(NotificationPreferences prefs) =>
+      savePreference(kvNotificationPrefs, jsonEncode(prefs.toJson()));
+
+  /// Inserts or updates many transactions at once (used when moving
+  /// transactions between cycles or restoring backups).
+  Future<void> upsertTransactions(List<Transaction> transactions) async {
+    try {
+      await db.transaction(() async {
+        for (final t in transactions) {
+          await db.into(db.transactionsTable).insertOnConflictUpdate(
+                _transactionCompanion(t),
+              );
+        }
+      });
+    } catch (e, st) {
+      _handleDbError(e, st);
+    }
+  }
+
+  TransactionsTableCompanion _transactionCompanion(Transaction transaction) {
+    return TransactionsTableCompanion.insert(
+      id: transaction.id,
+      cycleId: transaction.cycleId,
+      amountPaise: transaction.amount.paise,
+      title: transaction.title,
+      category: transaction.category.name,
+      timestamp: transaction.timestamp,
+      source: Value(transaction.source.name),
+      isFixedExpense: Value(transaction.isFixedExpense),
+      transactionType: Value(transaction.type.name),
+      dedupeKey: Value(transaction.dedupeKey),
+      earnedXp: Value(transaction.earnedXp),
+      earnedCoins: Value(transaction.earnedCoins),
+      splitTotalPaise: Value(transaction.splitTotal?.paise),
+      splitUserSharePaise: Value(transaction.splitUserShare?.paise),
+      pendingReimbursementPaise: Value(transaction.pendingReimbursement?.paise),
+      isReimbursement: Value(transaction.isReimbursement),
+      parentTransactionId: Value(transaction.parentTransactionId),
+    );
+  }
 
   Never _handleDbError(Object e, StackTrace st) {
     if (e is SqliteException) {
@@ -40,7 +153,11 @@ class SalaryQuestRepository {
     required List<DailyBudget> dailyBudgets,
     required HeroCharacter hero,
     required List<DailyQuest> quests,
+    int? bossCurrentHp,
+    int? bossMaxHp,
   }) async {
+    final effectiveBossMax = bossMaxHp ?? defaultBossHpFor(cycle);
+    final effectiveBossCurrent = bossCurrentHp ?? effectiveBossMax;
     try {
       await db.transaction(() async {
         // 1. Upsert Cycle
@@ -56,8 +173,8 @@ class SalaryQuestRepository {
                 fixedExpensesPaise: cycle.fixedExpensesTotal.paise,
                 savingsTargetPaise: cycle.savingsTargetAmount.paise,
                 rolloverStrategy: Value(cycle.rolloverStrategy.name),
-                bossCurrentHp: cycle.discretionaryPool.inWholeRupees,
-                bossMaxHp: cycle.discretionaryPool.inWholeRupees,
+                bossCurrentHp: effectiveBossCurrent,
+                bossMaxHp: effectiveBossMax,
               ),
             );
 
@@ -99,7 +216,10 @@ class SalaryQuestRepository {
               ),
             );
 
-        // 4. Save Quests
+        await _saveHeroCosmetics(hero);
+
+        // 4. Save Quests (replace the full set so expired quests do not linger)
+        await db.delete(db.questsTable).go();
         for (final q in quests) {
           await db.into(db.questsTable).insertOnConflictUpdate(
                 QuestsTableCompanion.insert(
@@ -135,26 +255,7 @@ class SalaryQuestRepository {
       await db.transaction(() async {
         // 1. Insert transaction
         await db.into(db.transactionsTable).insertOnConflictUpdate(
-              TransactionsTableCompanion.insert(
-                id: transaction.id,
-                cycleId: transaction.cycleId,
-                amountPaise: transaction.amount.paise,
-                title: transaction.title,
-                category: transaction.category.name,
-                timestamp: transaction.timestamp,
-                source: Value(transaction.source.name),
-                isFixedExpense: Value(transaction.isFixedExpense),
-                transactionType: Value(transaction.type.name),
-                dedupeKey: Value(transaction.dedupeKey),
-                earnedXp: Value(transaction.earnedXp),
-                earnedCoins: Value(transaction.earnedCoins),
-                splitTotalPaise: Value(transaction.splitTotal?.paise),
-                splitUserSharePaise: Value(transaction.splitUserShare?.paise),
-                pendingReimbursementPaise:
-                    Value(transaction.pendingReimbursement?.paise),
-                isReimbursement: Value(transaction.isReimbursement),
-                parentTransactionId: Value(transaction.parentTransactionId),
-              ),
+              _transactionCompanion(transaction),
             );
 
         // 2. Update all rebalanced daily budgets
@@ -189,6 +290,8 @@ class SalaryQuestRepository {
                 streakShieldAvailable: Value(hero.streakShieldAvailable),
               ),
             );
+
+        await _saveHeroCosmetics(hero);
 
         // 4. Update Quests
         for (final q in quests) {
@@ -270,6 +373,8 @@ class SalaryQuestRepository {
               ),
             );
 
+        await _saveHeroCosmetics(hero);
+
         // 4. Update Boss HP
         await (db.update(db.cyclesTable)
               ..where((tbl) => tbl.id.equals(cycleId)))
@@ -289,6 +394,7 @@ class SalaryQuestRepository {
       // 1. Load active cycle
       final cycleRows = await (db.select(db.cyclesTable)
             ..where((tbl) => tbl.isArchived.equals(false))
+            ..orderBy([(tbl) => OrderingTerm.desc(tbl.startDate)])
             ..limit(1))
           .get();
 
@@ -393,6 +499,7 @@ class SalaryQuestRepository {
       } else {
         hero = const HeroCharacter(name: 'Aero');
       }
+      hero = await _applyHeroCosmetics(hero);
 
       // 5. Load Quests
       final questRows = await db.select(db.questsTable).get();
@@ -409,6 +516,7 @@ class SalaryQuestRepository {
                 progressValue: q.progressValue,
                 rewardXp: q.rewardXp,
                 rewardCoins: q.rewardCoins,
+                rewardHp: q.id == 'quest_fresh_start_recovery' ? 30 : 0,
                 isCompleted: q.isCompleted,
                 isClaimed: q.isClaimed,
               ))
@@ -454,6 +562,18 @@ class SalaryQuestRepository {
               ))
           .toList();
 
+      // 9. Load key-value preferences
+      final languageCode = await db.readKv(kvLanguage) ?? 'en';
+      NotificationPreferences notificationPreferences =
+          const NotificationPreferences();
+      final prefsRaw = await db.readKv(kvNotificationPrefs);
+      if (prefsRaw != null) {
+        try {
+          notificationPreferences = NotificationPreferences.fromJson(
+              jsonDecode(prefsRaw) as Map<String, dynamic>);
+        } catch (_) {}
+      }
+
       final currentDay = cycle.currentDayIndex(DateTime.now());
 
       return SalaryQuestState(
@@ -472,6 +592,10 @@ class SalaryQuestRepository {
         isAutoFlowSavingsEnabled: isAutoFlowSavings,
         autoFlowGoalId: autoFlowGoalId,
         achievements: achievements,
+        languageCode: languageCode,
+        notificationPreferences: notificationPreferences,
+        notificationsEnabled: notificationPreferences.enabled,
+        maxNotificationsPerDay: notificationPreferences.maxPerDay,
       );
     } catch (e, st) {
       _handleDbError(e, st);
@@ -637,6 +761,7 @@ class SalaryQuestRepository {
         await db.delete(db.achievementsTable).go();
         await db.delete(db.savingsGoalsTable).go();
         await db.delete(db.userSettingsTable).go();
+        await db.clearKv();
       });
     } catch (e, st) {
       _handleDbError(e, st);
@@ -662,6 +787,7 @@ class SalaryQuestRepository {
               streakShieldAvailable: Value(hero.streakShieldAvailable),
             ),
           );
+      await _saveHeroCosmetics(hero);
     } catch (e, st) {
       _handleDbError(e, st);
     }
